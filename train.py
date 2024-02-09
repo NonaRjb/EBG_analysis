@@ -7,6 +7,7 @@ import argparse
 import random
 import wandb
 import os
+from datetime import datetime
 import constants
 from dataset import load_data
 from models.trainer import ModelTrainer
@@ -25,6 +26,12 @@ def seed_everything(seed_val):
     random.seed(seed_val)
     torch.manual_seed(seed_val)
     torch.cuda.manual_seed(seed_val)
+
+
+def create_readme(config, path):
+    print(config.__dict__)
+    with open(os.path.join(path, 'README.md'), 'w+') as f:
+        print(config.__dict__, file=f)
 
 
 def parse_args():
@@ -71,6 +78,17 @@ if __name__ == "__main__":
             "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
             "save_path": cluster_save_path if device == 'cuda' else local_save_path
         }
+
+        directory_name = f"{dataset_name}_{eeg_enc_name}"
+        current_datetime = datetime.now()
+        directory_name += current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
+        cnt = 0
+        while os.path.exists(os.path.join(paths["save_path"], directory_name + str(cnt))):
+            cnt += 1
+        paths["save_path"] = os.path.join(paths["save_path"], directory_name + str(cnt))
+        os.makedirs(paths["save_path"])
+        print(f"Directory '{directory_name}' created.")
+        create_readme(wandb.config, path=paths['save_path'])
 
         constants.data_constants['tmin'] = args.tmin
         constants.data_constants['tmax'] = args.tmax
