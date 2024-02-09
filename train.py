@@ -76,11 +76,14 @@ if __name__ == "__main__":
         constants.data_constants['tmax'] = args.tmax
         constants.data_constants['ebg_transform'] = args.ebg_transform
 
-        data, weights, n_time_samples = load_data.load(dataset_name=dataset_name,
-                                                       path=paths['eeg_data'],
-                                                       batch_size=batch_size,
-                                                       seed=seed,
-                                                       device=device, **constants.data_constants)
+        # data, weights, n_time_samples = load_data.load(
+        loaders, data, n_time_samples = load_data.load(
+            dataset_name=dataset_name,
+            path=paths['eeg_data'],
+            batch_size=batch_size,
+            seed=seed,
+            device=device, **constants.data_constants
+            )
 
         # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
 
@@ -98,10 +101,10 @@ if __name__ == "__main__":
         constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples
         
         # sss = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=seed)
-        # train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
+        train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
 
         metrics = {'loss': [], 'acc': [], 'auroc': []}
-        g = torch.Generator().manual_seed(seed)
+        # g = torch.Generator().manual_seed(seed)
         # for fold, (train_ids, test_ids) in enumerate(sss.split(data, data.labels)):
 
         #     print(f'--------------- Fold {fold} ---------------')
@@ -111,17 +114,13 @@ if __name__ == "__main__":
         #     test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_ids, generator=g)
 
             # Define data loaders for training and testing data in this fold
-        train_size = int(0.8*len(data))
-        val_size = len(data) - train_size
-        train_data, val_data = torch.utils.data.random_split(
-        data, [train_size, val_size], generator=g)
     
-        train_loader = torch.utils.data.DataLoader(
-            data,
-            batch_size=batch_size, generator=g)
-        val_loader = torch.utils.data.DataLoader(
-            data,
-            batch_size=batch_size, generator=g)
+            # train_loader = torch.utils.data.DataLoader(
+            #     data,
+            #     batch_size=batch_size, sampler=train_sub_sampler)
+            # val_loader = torch.utils.data.DataLoader(
+            #     data,
+            #     batch_size=batch_size, sampler=test_sub_sampler)
 
         model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
         print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
@@ -137,7 +136,7 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError
         trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs, save_path=paths['save_path'],
-                               weights=weights, device=device)
+                               weights=None, device=device)
         best_model = trainer.train(train_loader, val_loader)
         metrics['loss'].append(best_model['loss'])
         metrics['acc'].append(best_model['acc'])

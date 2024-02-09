@@ -37,18 +37,18 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, 
     train_data, val_data, test_data = torch.utils.data.random_split(
         data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(seed))
 
-    train_labels = list(np.array(train_data.dataset.labels)[train_data.indices])
-    count_0 = train_labels.count(0.)
-    count_1 = train_labels.count(1.)
-    class_weights = (count_0 + count_1) / np.array([count_0, count_1])
-    sample_weights = np.array([class_weights[int(t)] for t in train_labels])
-    sample_weights = torch.from_numpy(sample_weights).double()
-    sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
+    # train_labels = list(np.array(train_data.dataset.labels)[train_data.indices])
+    # count_0 = train_labels.count(0.)
+    # count_1 = train_labels.count(1.)
+    # class_weights = (count_0 + count_1) / np.array([count_0, count_1])
+    # sample_weights = np.array([class_weights[int(t)] for t in train_labels])
+    # sample_weights = torch.from_numpy(sample_weights).double()
+    # sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
 
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False,
                                    drop_last=False,
                                    pin_memory=True if device == 'cuda' else False,
-                                   generator=g, sampler=sampler)
+                                   generator=g)
     if val_size > 0:
         val_data_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True,
                                      drop_last=False,
@@ -70,7 +70,8 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, 
         'test_loader': test_data_loader
     }
 
-    return data, data.class_weight, n_time_samples
+    # return data, data.class_weight, n_time_samples
+    return loaders, data, n_time_samples
 
 
 def load_ebg1_ml(root_path: str, **kwargs):

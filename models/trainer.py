@@ -22,7 +22,7 @@ class ModelTrainer:
         self.device = device
 
         self.model = model.to(device)
-        self.loss_cls = nn.BCEWithLogitsLoss(pos_weight=weights).to(device)
+        self.loss_cls = nn.BCEWithLogitsLoss().to(device)
         self.accuracy = Accuracy(task='binary').to(self.device)
         self.auroc = AUROC(task="binary")
         self.optimizer = optimizer
