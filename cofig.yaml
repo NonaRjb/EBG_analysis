@@ -13,18 +13,17 @@ parameters:
   eeg:
     value: lstm
   dropout:
-    value:
-      - 0.5
+    value: 0.25
   hidden_size:
     value: 64
   num_layers:
-    value: 5
+    value: 1
   batch_size:
     value: 32
   lr:
     value: 0.0001
   epoch:
-    value: 500
+    value: 300
   optim_name:
     value: adamw
   seed:

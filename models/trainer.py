@@ -52,7 +52,6 @@ class ModelTrainer:
             progress_bar = tqdm(train_data_loader)
             for x, y in progress_bar:
                 self.optimizer.zero_grad()
-
                 x = x.to(self.device)
                 y = y.to(self.device)
 
@@ -63,7 +62,7 @@ class ModelTrainer:
 
                 loss_epoch.append(loss_classification.item())
                 y_true.extend(y)
-                y_pred.extend(torch.sigmoid(preds) >= 0.5)
+                y_pred.extend(torch.sigmoid(preds))
 
                 scaler.scale(loss_classification).backward()
                 scaler.step(self.optimizer)
@@ -74,8 +73,9 @@ class ModelTrainer:
             with torch.no_grad():
                 # train_avg_acc = self.accuracy(torch.stack(y_pred), torch.stack(y_true))
                 train_loss = np.mean(loss_epoch)
+                y_pred_bin = torch.stack(y_pred) >= 0.5
                 train_auroc = self.auroc(torch.stack(y_pred).detach().cpu().float(), torch.stack(y_true).detach().cpu())
-                train_balanced_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), torch.stack(y_pred).
+                train_balanced_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), y_pred_bin.
                                                              detach().cpu())
 
             val_loss, val_balanaced_acc, val_auroc = self.evaluate(self.model, val_data_loader)
@@ -152,11 +152,12 @@ class ModelTrainer:
 
                 loss_epoch.append(loss_classification.item())
                 y_true.extend(y)
-                y_pred.extend(torch.sigmoid(preds) >= 0.5)
+                y_pred.extend(torch.sigmoid(preds))
 
             mean_loss_epoch = np.mean(loss_epoch)
+            y_pred_bin = torch.stack(y_pred) >= 0.5
             # avg_acc = self.accuracy(torch.stack(y_pred), torch.stack(y_true))
             auroc = self.auroc(torch.stack(y_pred).detach().cpu().float(), torch.stack(y_true).detach().cpu())
-            avg_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), torch.stack(y_pred).detach().cpu())
+            avg_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), y_pred_bin.detach().cpu())
 
         return mean_loss_epoch, avg_acc, auroc

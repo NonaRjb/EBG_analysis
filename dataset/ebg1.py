@@ -103,6 +103,7 @@ class EBG1(Dataset):
         else:
             self.data = self.ebg
 
+
         # if self.transform == 'tfr_morlet':
         #     self.data = data_utils.apply_tfr(self.data, self.fs, self.freqs, method='dpss')
         #     # self.baseline = np.mean(self.data[:, :, self.f_min:self.f_max, self.baseline_min:self.baseline_max], axis=(0, -1),
@@ -114,8 +115,8 @@ class EBG1(Dataset):
         #     np.save('/Midgard/home/nonar/EBG_analysis/tfr1_baseline_corrected.npy')
         #     self.data = self.data[:, :, self.f_min:self.f_max, self.t_min:self.t_max]
         # else:
-        #     self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
-        #     self.data = self.data[..., self.t_min:self.t_max] - self.baseline
+        self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
+        self.data = self.data[..., self.t_min:self.t_max] - self.baseline
         #
         # if shuffle_labels:
         #     self.labels = random.Random(seed).sample(self.labels, len(self.labels))
