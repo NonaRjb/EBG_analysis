@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.nn import LSTM
-from torch.autograd import Variable
 
 
 class LSTMClassifier(nn.Module):

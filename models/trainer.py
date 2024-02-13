@@ -17,6 +17,7 @@ class ModelTrainer:
             optimizer: torch.optim.Optimizer,
             weights: torch.Tensor,
             n_epochs: int,
+            scheduler,
             save_path, device='cuda'
     ):
 
@@ -27,13 +28,14 @@ class ModelTrainer:
         self.accuracy = Accuracy(task='binary').to(self.device)
         self.auroc = AUROC(task="binary")
         self.optimizer = optimizer
+        self.scheduler = scheduler
 
         self.epochs = n_epochs
         self.mixed_precision = True
 
         self.save_path = save_path
         self.patience = 2000
-        self.log_freq = 2
+        self.log_freq = 1
 
         # y_true and y_pred for debugging
         self.y_true_train = []
@@ -103,11 +105,17 @@ class ModelTrainer:
                 else:
                     patience -= 1
 
+                for param_group in self.optimizer.param_groups:
+                    learning_rate = param_group["lr"]
+
+                self.scheduler.step(val_loss)
+
                 # if patience == 0:
                 #     break
                 print(f'---------------------- Epoch: {epoch} ----------------------')
                 print(f'Training AUROC: {train_auroc} | Training Acc.: {train_balanced_acc} | Training Loss: {train_loss}')
                 print(f'Validation AUROC: {val_auroc} | Validation Acc: {val_balanaced_acc} | Validation Loss: {val_loss}')
+                print(f'lr = {learning_rate}')
 
                 self.y_true_train.append(torch.stack(y_true).detach().cpu().numpy())
                 self.y_pred_train.append(torch.stack(y_pred).detach().cpu())
@@ -121,8 +129,10 @@ class ModelTrainer:
                     "val_acc": val_balanaced_acc,
                     "val_loss": val_loss,
                     "val_auroc": val_auroc,
+                    "lr": learning_rate,
                     "epoch": epoch
                 })
+                
 
         print("Finished training.")
         print("Creating checkpoint.")

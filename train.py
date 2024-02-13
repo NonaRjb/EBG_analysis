@@ -49,6 +49,7 @@ def parse_args():
     parser.add_argument('--optim_name', type=str, default='adamw')
     parser.add_argument('-b', '--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--lr_scheduler', type=str, default='plateau')
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=42)
     return parser.parse_args()
@@ -66,6 +67,7 @@ if __name__ == "__main__":
         eeg_enc_name = args.eeg
         batch_size = args.batch_size
         lr = args.lr
+        scheduler_name = args.lr_scheduler
         epochs = args.epoch
         optim_name = args.optim_name
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -104,6 +106,7 @@ if __name__ == "__main__":
             )
 
         # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
+        print("EEG sequence length = ", n_time_samples)
 
         if args.dropout is not None:
             constants.model_constants['lstm']['dropout'] = args.dropout
@@ -116,7 +119,9 @@ if __name__ == "__main__":
             constants.model_constants['rnn']['num_layers'] = args.num_layers
 
         constants.model_constants['eegnet']['n_samples'] = n_time_samples
+        constants.model_constants['eegnet1d']['n_samples'] = n_time_samples
         constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples
+        constants.model_constants['resnet1d']['n_samples'] = n_time_samples
         
         # sss = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=seed)
         train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
@@ -141,10 +146,11 @@ if __name__ == "__main__":
             #     batch_size=batch_size, sampler=test_sub_sampler)
 
         model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
+        print(model)
         print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
         model = model.double()
         if optim_name == 'adam':
-            optim = Adam(model.parameters(), lr=lr, weight_decay=0.05)
+            optim = Adam(model.parameters(), lr=lr, weight_decay=0.1)
         elif optim_name == 'adamw':
             optim = AdamW(model.parameters(), lr=lr, weight_decay=0.1, amsgrad=True)
         elif optim_name == 'rmsprop':
@@ -153,8 +159,25 @@ if __name__ == "__main__":
             optim = SGD(model.parameters(), lr=lr, momentum=0.1, weight_decay=0.05)
         else:
             raise NotImplementedError
+        
+        if scheduler_name == 'plateau':
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=10,
+                                                     min_lr=0.1 * 1e-7,
+                                                     factor=0.1)
+        elif scheduler_name == 'multistep':    
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[16, 64, 256],
+                                                        gamma=0.1)
+        elif scheduler_name == 'exp':
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.99, last_epoch=-1)
+        elif scheduler_name == 'linear':
+            scheduler = torch.optim.lr_scheduler.LinearLR(optim, start_factor=1., end_factor=0.5, total_iters=30)
+        elif scheduler_name == 'cosine':
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=0, last_epoch=-1)
+        else:
+            raise NotImplementedError
+        
         trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs, save_path=paths['save_path'],
-                               weights=None, device=device)
+                               weights=None, device=device, scheduler=scheduler)
         best_model = trainer.train(train_loader, val_loader)
         metrics['loss'].append(best_model['loss'])
         metrics['acc'].append(best_model['acc'])
