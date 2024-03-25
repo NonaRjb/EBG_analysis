@@ -3,6 +3,7 @@ import scipy.io as scio
 import mat73
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+import mne
 
 
 def load_ebg1_mat(filename, trials_to_keep):
@@ -31,7 +32,6 @@ def load_ebg1_mat(filename, trials_to_keep):
 
 
 def load_ebg1_tfr(filename_air, filename_odor, n_subjects=29):
-
     """
     Load pre-computed time-frequency representations by Iravani et al. (2020) (Original EBG paper)
     :param filename_air:
@@ -59,7 +59,7 @@ def load_ebg1_tfr(filename_air, filename_odor, n_subjects=29):
         else:
             ebg_data = np.vstack((ebg_data, data_subject))
             labels = np.vstack((labels, np.vstack((np.zeros((len(air_tfr), 1)), np.ones((len(odor_tfr), 1))))))
-        subject_ids.extend(len(data_subject)*[s])
+        subject_ids.extend(len(data_subject) * [s])
 
     return ebg_data, labels, np.array(subject_ids), time, freq
 
@@ -77,6 +77,28 @@ def load_ebg3_tfr(filename):
     time = data_struct['CNT']['TFR'][0][0]['AIR'][0][0]['time'][0][0].squeeze()
 
     return ebg_data, labels, time, freq
+
+
+def load_source_data_recent(filename):
+    print(f"********** loading source data from {filename} **********")
+
+    mat73_files = [21, 22, 23, 24, 25]
+    if int(filename.split("/")[-2]) in mat73_files:
+        data_struct = mat73.loadmat(filename)
+
+        data = np.asarray(data_struct['source_data_ROI']['trial'])
+        time = data_struct['source_data_ROI']['time']
+        labels = data_struct['source_data_ROI']['trialinfo'].squeeze()
+    else:
+        data_struct = scio.loadmat(filename)
+
+        data = np.asarray(list(data_struct['source_data_ROI']['trial'][0][0][0]))
+        time = data_struct['source_data_ROI']['time'][0][0][0][0].squeeze()
+        labels = data_struct['source_data_ROI']['trialinfo'][0][0].squeeze()
+    fs = 512
+    labels = labels[:, 0]
+
+    return data, labels, time, fs
 
 
 def apply_tfr(in_data: np.ndarray, fs: float, freqs: np.ndarray, n_cycles: float = 3.0, method: str = 'morlet'):

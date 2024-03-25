@@ -8,6 +8,7 @@ import os
 from dataset.ebg1 import EBG1
 from dataset.ebg1_tfr import EBG1TFR
 from dataset.ebg3 import EBG3TFR
+from dataset.source_data_recent import SourceData
 import dataset.data_utils as data_utils
 
 
@@ -25,6 +26,8 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, 
         data = EBG3TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'],
                        baseline_type=kwargs['baseline_type'])
+    elif dataset_name == 'source_data_recent':
+        data = SourceData(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'])
     else:
         raise NotImplementedError
 

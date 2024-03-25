@@ -5,61 +5,47 @@ from torch.utils.data import Dataset
 import os
 import random
 import dataset.data_utils as data_utils
-from dataset.data_utils import load_ebg1_mat
+from dataset.data_utils import load_source_data_recent
 
 
-class EBG1(Dataset):
+class SourceData(Dataset):
     def __init__(
             self, root_path: str,
             tmin: float = None,
             tmax: float = None,
-            fmin: float = None,
-            fmax: float = None,
             binary: bool = True,
-            transform: str = None,
-            freqs: np.ndarray = None,
-            include_eeg: bool = False,
             shuffle_labels: bool = False,
             seed: int = 42
     ):
 
         self.root_path = root_path
-        recordings = ['SL06_' + str("{:02d}".format(subject_id)) + '.mat' for subject_id in range(1, 31) if
-                      subject_id != 4]
-        indices_to_keep = scio.loadmat(os.path.join(root_path, 'kept_indices_dataset1.mat'))
-        indices_to_keep = indices_to_keep['kept_trials']
+        subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2
-        self.eeg = None
-        self.ebg = None
+        self.source_data = None
         self.labels = None
         self.subject_id = None
         self.fs = None
         self.time_vec = None
         self.class_weight = None
-        self.transform = transform
-        self.freqs = freqs
-        self.include_eeg = include_eeg
 
-        for i, recording in enumerate(recordings):
-            file = os.path.join(root_path, recording)
-            eeg, ebg, label, time_vec, fs = load_ebg1_mat(file, indices_to_keep[0][i])
+        for i, subject in enumerate(subjects):
+            file = os.path.join(root_path, str(subject), "source_data.mat")
+            source_data, label, time_vec, fs = load_source_data_recent(file)
 
             if self.fs is None:
-                self.fs = fs.astype(float)
+                self.fs = float(fs)
 
             if self.time_vec is None:
                 self.time_vec = time_vec
 
-            if self.eeg is None:
-                self.eeg = eeg
-                self.ebg = ebg
+            if self.source_data is None:
+                self.source_data = source_data
                 self.labels = np.expand_dims(label, axis=1)
                 self.subject_id = i * np.ones((len(label), 1))
             else:
-                self.eeg = np.vstack((self.eeg, eeg))
-                self.ebg = np.vstack((self.ebg, ebg))
+                self.source_data = np.vstack((self.source_data, source_data))
                 self.labels = np.vstack((self.labels, np.expand_dims(label, axis=1)))
                 self.subject_id = np.vstack((self.subject_id, i * np.ones((len(label), 1))))
 
@@ -73,22 +59,12 @@ class EBG1(Dataset):
         else:
             self.t_max = np.abs(self.time_vec - tmax).argmin()
 
-        if fmin is None:
-            self.f_min = 0
-        else:
-            self.f_min = np.abs(self.freqs - fmin).argmin()
-
-        if fmax is None:
-            self.f_max = len(self.freqs)
-        else:
-            self.f_max = np.abs(self.freqs - fmax).argmin()
-
         self.baseline_min = np.abs(self.time_vec - self.baseline_min).argmin()
         self.baseline_max = np.abs(self.time_vec - self.baseline_max).argmin()
         self.time_vec = self.time_vec[self.t_min:self.t_max]
 
         if binary:
-            new_labels = [0. if label == 40 else 1. for label in self.labels]
+            new_labels = [1. if y == 64 else 0. for y in self.labels]
             self.labels = new_labels
             # self.class_weight = torch.tensor([
             #     len(new_labels) / (new_labels.count(0.) * 2),
@@ -98,11 +74,7 @@ class EBG1(Dataset):
             class_1_count = new_labels.count(1.)
             self.class_weight = torch.tensor(class_0_count/class_1_count)
 
-        if self.include_eeg:
-            self.data = np.concatenate((self.eeg, self.ebg), axis=1)
-        else:
-            self.data = self.ebg
-
+        self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
         self.data = self.data[..., self.t_min:self.t_max] - self.baseline
 
@@ -117,8 +89,8 @@ class EBG1(Dataset):
 
 
 if __name__ == "__main__":
-    data_args = {'tmin': None, 'tmax': None, 'transform': None, 'freqs': np.linspace(20, 100, 160)}
-    ebg_dataset = EBG1(root_path='/Users/nonarajabi/Desktop/KTH/Smell/Novel_Bulb_measure/data/', **data_args)
+    data_args = {'tmin': None, 'tmax': None}
+    ebg_dataset = SourceData(root_path='/Volumes/T5 EVO/Odor_Intensity/', **data_args)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_ebg.npy'), ebg_dataset.ebg)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_labels.npy'),
     #         np.array(ebg_dataset.labels))
