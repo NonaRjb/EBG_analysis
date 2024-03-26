@@ -37,12 +37,12 @@ def create_readme(config, path):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default=None)
-    parser.add_argument('--data', type=str, default='dataset3_tfr')
+    parser.add_argument('--data', type=str, default='source_data_recent')
     parser.add_argument('--tmin', type=float, default=None)
     parser.add_argument('--tmax', type=float, default=None)
     parser.add_argument('--ebg_transform', type=str, default='tfr_morlet')
     parser.add_argument('--subject_id', type=int, default=0)
-    parser.add_argument('--eeg', type=str, default='lstm')
+    parser.add_argument('--eeg', type=str, default='eegnet')
     parser.add_argument('--dropout', type=float, default=None)
     parser.add_argument('--hidden_size', type=int, default=None)
     parser.add_argument('--num_layers', type=str, default=None)
@@ -79,6 +79,8 @@ if __name__ == "__main__":
 
         if dataset_name == 'dataset3_tfr':
             local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
+        elif dataset_name == 'source_data_recent':
+            local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
 
         paths = {
             "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
