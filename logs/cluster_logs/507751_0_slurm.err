@@ -1,0 +1,63 @@
+wandb: Appending key for api.wandb.ai to your netrc file: /Midgard/home/nonar/.netrc
+wandb: Starting wandb agent 🕵️
+2024-02-07 15:48:31,150 - wandb.wandb_agent - INFO - Running runs: []
+2024-02-07 15:48:31,470 - wandb.wandb_agent - INFO - Agent received command: run
+2024-02-07 15:48:31,470 - wandb.wandb_agent - INFO - Agent starting run with config:
+	batch_size: 32
+	data: dataset1
+	dropout: [0.25]
+	ebg_transform: tfr_morlet
+	eeg: lstm
+	epoch: 300
+	hidden_size: 64
+	lr: 0.0001
+	num_layers: 1
+	optim_name: adamw
+	seed: 42
+	subject_id: 0
+	tmax: 0.3
+	tmin: -0.1
+2024-02-07 15:48:31,476 - wandb.wandb_agent - INFO - About to run command: /usr/bin/env python /Midgard/home/nonar/EBG_analysis/train.py --batch_size=32 --data=dataset1 --dropout=[0.25] --ebg_transform=tfr_morlet --eeg=lstm --epoch=300 --hidden_size=64 --lr=0.0001 --num_layers=1 --optim_name=adamw --seed=42 --subject_id=0 --tmax=0.3 --tmin=-0.1
+2024-02-07 15:48:36,487 - wandb.wandb_agent - INFO - Running runs: ['fq3xvwxo']
+wandb: Currently logged in as: nonar (nona-phd). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.3 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in /Midgard/home/nonar/EBG_analysis/wandb/run-20240207_154856-fq3xvwxo
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run curious-sweep-1
+wandb: ⭐️ View project at https://wandb.ai/nona-phd/EBG_Olfaction
+wandb: 🧹 View sweep at https://wandb.ai/nona-phd/EBG_Olfaction/sweeps/l2mb1i4f
+wandb: 🚀 View run at https://wandb.ai/nona-phd/EBG_Olfaction/runs/fq3xvwxo
+Traceback (most recent call last):
+  File "/Midgard/home/nonar/EBG_analysis/train.py", line 120, in <module>
+    model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
+  File "/Midgard/home/nonar/EBG_analysis/models/load_model.py", line 14, in load
+    return LSTMClassifier(**kwargs)
+  File "/Midgard/home/nonar/EBG_analysis/models/lstm.py", line 15, in __init__
+    self.lstm = LSTM(
+  File "/Midgard/home/nonar/miniconda3/envs/cuda_11/lib/python3.9/site-packages/torch/nn/modules/rnn.py", line 673, in __init__
+    super(LSTM, self).__init__('LSTM', *args, **kwargs)
+  File "/Midgard/home/nonar/miniconda3/envs/cuda_11/lib/python3.9/site-packages/torch/nn/modules/rnn.py", line 51, in __init__
+    self.dropout = float(dropout)
+TypeError: float() argument must be a string or a number, not 'list'
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: 🚀 View run curious-sweep-1 at: https://wandb.ai/nona-phd/EBG_Olfaction/runs/fq3xvwxo
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240207_154856-fq3xvwxo/logs
+Traceback (most recent call last):
+  File "/Midgard/home/nonar/EBG_analysis/train.py", line 120, in <module>
+    model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
+  File "/Midgard/home/nonar/EBG_analysis/models/load_model.py", line 14, in load
+    return LSTMClassifier(**kwargs)
+  File "/Midgard/home/nonar/EBG_analysis/models/lstm.py", line 15, in __init__
+    self.lstm = LSTM(
+  File "/Midgard/home/nonar/miniconda3/envs/cuda_11/lib/python3.9/site-packages/torch/nn/modules/rnn.py", line 673, in __init__
+    super(LSTM, self).__init__('LSTM', *args, **kwargs)
+  File "/Midgard/home/nonar/miniconda3/envs/cuda_11/lib/python3.9/site-packages/torch/nn/modules/rnn.py", line 51, in __init__
+    self.dropout = float(dropout)
+TypeError: float() argument must be a string or a number, not 'list'
+2024-02-07 15:49:30,722 - wandb.wandb_agent - INFO - Cleaning up finished run: fq3xvwxo
+2024-02-07 15:49:35,338 - wandb.wandb_agent - INFO - Agent received command: exit
+2024-02-07 15:49:35,338 - wandb.wandb_agent - INFO - Received exit command. Killing runs and quitting.
+wandb: Terminating and syncing runs. Press ctrl-c to kill.

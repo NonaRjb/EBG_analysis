@@ -11,7 +11,7 @@ data_constants = {
     'val_size': 0.1,
     'ebg_transform': None,
     'shuffle_labels': False,
-    'include_eeg': True,
+    'include_eeg': False,
     'tfr_freqs': np.linspace(20, 100, 160),
     'baseline_type': 'zscore'
 }
@@ -30,7 +30,7 @@ else:
 model_constants = {
     'eegnet': {'n_channels': 4, 'n_classes': 2},
     'eegnet_attention': {'n_channels': 68, 'n_classes': 2},
-    'lstm': {'input_size': lstm_input_size, 'hidden_size': 64, 'num_layers': 1, 'dropout': 0.5, 'n_classes': 2},
+    'lstm': {'input_size': 4, 'hidden_size': 64, 'num_layers': 1, 'dropout': 0.5, 'n_classes': 2},
     'rnn': {'input_size': 4, 'hidden_size': 16, 'num_layers': 1, 'dropout': 0.2, 'n_classes': 2},
     'tfrnet': {}
 }

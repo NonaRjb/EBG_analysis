@@ -30,7 +30,7 @@ class EEGNet(nn.Module):
         ]))
 
     def forward(self, x):
-        x = x.double()
+        x = x.unsqueeze(dim=1).double()
         x = self.model(x)
         return x
 

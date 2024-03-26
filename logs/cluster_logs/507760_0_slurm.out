@@ -1,0 +1,13 @@
+You have the following GPUs: [0]
+JOB:  507760
+TASK: 0
+HOST: khazadum
+
+sweep_id: xd6sm7gd
+project_name: EBG_Olfaction
+job array task: 0
+device =  cuda
+train_size=1507, val_size=188, test_size=189
+--------------- Fold 0 ---------------
+Training eegnet with {'n_channels': 4, 'n_classes': 2, 'n_samples': 205}
+Training Started...

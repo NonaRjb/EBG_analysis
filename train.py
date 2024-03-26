@@ -48,9 +48,9 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    with wandb.init(project="EBG_Olfaction", config=args):
-        # with wandb.init():
+    # args = parse_args()
+    # with wandb.init(project="EBG_Olfaction", config=args):
+    with wandb.init():
         args = wandb.config
         seed = args.seed
         seed_everything(seed)
@@ -84,7 +84,7 @@ if __name__ == "__main__":
                                                        seed=seed,
                                                        device=device, **constants.data_constants)
 
-        constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
+        # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
 
         if args.dropout is not None:
             constants.model_constants['lstm']['dropout'] = args.dropout
@@ -96,9 +96,10 @@ if __name__ == "__main__":
             constants.model_constants['lstm']['num_layers'] = args.num_layers
             constants.model_constants['rnn']['num_layers'] = args.num_layers
 
-        sss = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=seed)
         constants.model_constants['eegnet']['n_samples'] = n_time_samples
         constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples
+        
+        sss = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=seed)
         # train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
 
         metrics = {'loss': [], 'acc': [], 'auroc': []}
@@ -120,7 +121,7 @@ if __name__ == "__main__":
                 batch_size=batch_size, sampler=test_sub_sampler)
 
             model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
-            print(f"Training {eeg_enc_name} with {constants.model_constants[eeg_enc_name]}")
+            print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
             model = model.double()
             if optim_name == 'adam':
                 optim = Adam(model.parameters(), lr=lr, weight_decay=0.05)

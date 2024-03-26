@@ -1,0 +1,8 @@
+You have the following GPUs: [1]
+JOB:  507767
+TASK: 0
+HOST: khazadum
+
+sweep_id: h3h71kga
+project_name: EBG_Olfaction
+job array task: 0
