@@ -38,7 +38,6 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, 
 
     print(f"*** train set size = {train_size} | val set size = {val_size} | test set size = {test_size} ***")
 
-
     train_data, val_data, test_data = torch.utils.data.random_split(
         data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(seed))
 

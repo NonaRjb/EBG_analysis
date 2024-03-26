@@ -8,7 +8,7 @@ data_constants = {
     'fmax': None,
     'binary': True,
     'train_size': 0.8,
-    'val_size': 0.1,
+    'val_size': 0.2,
     'ebg_transform': None,
     'shuffle_labels': False,
     'include_eeg': False,

@@ -34,7 +34,6 @@ class EEGNet(nn.Module):
         x = x.unsqueeze(dim=1).double()
         x = self.model(x)
         return x
-    
 
 
 class EEGNet1D(nn.Module):
@@ -105,7 +104,7 @@ class LSTMClassifier(nn.Module):
         # out = nn.functional.relu(self.fc2(out))
         out = self.fc3(final_h)
         return out
-    
+
 
 class RNNClassifier(nn.Module):
     def __init__(self, bidirectional=False, **kwargs):
@@ -143,7 +142,7 @@ class RNNClassifier(nn.Module):
         # out = nn.functional.relu(self.fc2(out))
         out = self.fc3(final_h)
         return out
-    
+
 
 class TFRNet(nn.Module):
     def __init__(self):
@@ -204,7 +203,8 @@ def _padding(downsample, kernel_size):
     padding = max(0, int(np.floor((kernel_size - downsample + 1) / 2)))
     return padding
 
-# Code from GitHub repository of: Lima, E.M., Ribeiro, A.H., Paixão, G.M.M. et al. Deep neural network-estimated electrocardiographic age as a 
+
+# Code from GitHub repository of: Lima, E.M., Ribeiro, A.H., Paixão, G.M.M. et al. Deep neural network-estimated electrocardiographic age as a
 # mortality predictor. Nat Commun 12, 5117 (2021). https://doi.org/10.1038/s41467-021-25351-7. 
 def _downsample(n_samples_in, n_samples_out):
     """Compute downsample rate"""
@@ -303,7 +303,8 @@ class ResNet1d(nn.Module):
            on Computer Vision and Pattern Recognition (CVPR), 2016, pp. 770-778. https://arxiv.org/pdf/1512.03385.pdf
     """
 
-    def __init__(self, n_channels, n_samples, net_filter_size, net_seq_length, n_classes, kernel_size=17, dropout_rate=0.5):
+    def __init__(self, n_channels, n_samples, net_filter_size, net_seq_length, n_classes, kernel_size=17,
+                 dropout_rate=0.5):
         super(ResNet1d, self).__init__()
         # my modifications!
         input_dim = (n_channels, n_samples)
@@ -353,4 +354,3 @@ class ResNet1d(nn.Module):
         # Fully conected layer
         x = self.lin(x)
         return x
-    

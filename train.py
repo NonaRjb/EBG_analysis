@@ -42,7 +42,7 @@ def parse_args():
     parser.add_argument('--tmax', type=float, default=None)
     parser.add_argument('--ebg_transform', type=str, default='tfr_morlet')
     parser.add_argument('--subject_id', type=int, default=0)
-    parser.add_argument('--eeg', type=str, default='eegnet')
+    parser.add_argument('--eeg', type=str, default='eegnet1d')
     parser.add_argument('--dropout', type=float, default=None)
     parser.add_argument('--hidden_size', type=int, default=None)
     parser.add_argument('--num_layers', type=str, default=None)

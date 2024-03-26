@@ -72,6 +72,7 @@ class SourceData(Dataset):
             # ])
             class_0_count = new_labels.count(0.)
             class_1_count = new_labels.count(1.)
+            print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
             self.class_weight = torch.tensor(class_0_count/class_1_count)
 
         self.data = self.source_data
@@ -89,7 +90,7 @@ class SourceData(Dataset):
 
 
 if __name__ == "__main__":
-    data_args = {'tmin': None, 'tmax': None}
+    data_args = {'tmin': -0.2, 'tmax': 0.3}
     ebg_dataset = SourceData(root_path='/Volumes/T5 EVO/Odor_Intensity/', **data_args)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_ebg.npy'), ebg_dataset.ebg)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_labels.npy'),
