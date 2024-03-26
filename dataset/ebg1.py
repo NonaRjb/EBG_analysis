@@ -18,7 +18,7 @@ class EBG1(Dataset):
             binary: bool = True,
             transform: str = None,
             freqs: np.ndarray = None,
-            include_eeg: bool = False,
+            modality: str = 'ebg',
             shuffle_labels: bool = False,
             seed: int = 42
     ):
@@ -40,7 +40,7 @@ class EBG1(Dataset):
         self.class_weight = None
         self.transform = transform
         self.freqs = freqs
-        self.include_eeg = include_eeg
+        self.modality = modality
 
         for i, recording in enumerate(recordings):
             file = os.path.join(root_path, recording)
@@ -88,7 +88,8 @@ class EBG1(Dataset):
         self.time_vec = self.time_vec[self.t_min:self.t_max]
 
         if binary:
-            new_labels = [0. if label == 40 else 1. for label in self.labels]
+            new_labels = [1. if label == 40 else 0. for label in self.labels]
+            # new_labels = self.labels != 40
             self.labels = new_labels
             # self.class_weight = torch.tensor([
             #     len(new_labels) / (new_labels.count(0.) * 2),
@@ -98,7 +99,11 @@ class EBG1(Dataset):
             class_1_count = new_labels.count(1.)
             self.class_weight = torch.tensor(class_0_count/class_1_count)
 
-        if self.include_eeg:
+        if self.modality == 'ebg':
+            self.data = self.ebg
+        elif self.modality == 'eeg':
+            self.data = self.eeg
+        elif self.modality == 'both':
             self.data = np.concatenate((self.eeg, self.ebg), axis=1)
         else:
             self.data = self.ebg
@@ -120,6 +125,10 @@ class EBG1(Dataset):
         #
         # if shuffle_labels:
         #     self.labels = random.Random(seed).sample(self.labels, len(self.labels))
+        
+        # print(np.mean(self.data, axis=-1))
+        # print(np.std(self.data, axis=-1))
+        # exit(1)
 
     def __len__(self):
         return len(self.labels)
@@ -127,7 +136,8 @@ class EBG1(Dataset):
     def __getitem__(self, item):
         if torch.is_tensor(item):
             item = item.tolist()
-        sample = self.data[item, ...]
+        sample = torch.from_numpy(self.data[item, ...])
+        label = self.labels[item]
         # if self.transform == 'tfr_morlet':
         #     # sample = ebg_transforms.apply_tfr_morlet(np.expand_dims(self.sample[item, :, :], axis=0), self.fs, self.freqs)
         #     # sample = 10 * np.log10(np.expand_dims(self.data[item, ...], axis=0) / self.baseline)
@@ -146,7 +156,7 @@ class EBG1(Dataset):
         #     #        - np.mean(self.sample[item, ...], axis=-1, keepdims=True)) / \
         #     #       np.std(self.sample[item, ...], axis=-1, keepdims=True)
         #     sample = torch.from_numpy(sample).double()
-        return sample, self.labels[item]
+        return sample, label
 
 
 if __name__ == "__main__":

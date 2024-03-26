@@ -90,9 +90,9 @@ class ModelTrainer:
             if epoch % self.log_freq == 0 or epoch == self.epochs - 1:
                 val_loss, val_balanaced_acc, val_auroc, y_true_val, y_pred_val = self.evaluate(self.model, val_data_loader)
                 # if val_loss < best_loss:
-                if val_balanaced_acc > best_acc:
+                if val_auroc > best_acc:
                     # best_loss = val_loss
-                    best_acc = val_balanaced_acc
+                    best_acc = val_auroc
                     patience = self.patience
                     best_model = {
                         'epoch': epoch,
@@ -123,10 +123,10 @@ class ModelTrainer:
                 self.y_pred_val.append(torch.stack(y_pred_val).detach().cpu())
                 
                 wandb.log({
-                    "train_acc": train_balanced_acc,
+                    # "train_acc": train_balanced_acc,
                     "train_loss": train_loss,
                     "train_auroc": train_auroc,
-                    "val_acc": val_balanaced_acc,
+                    # "val_acc": val_balanaced_acc,
                     "val_loss": val_loss,
                     "val_auroc": val_auroc,
                     "lr": learning_rate,
@@ -147,13 +147,13 @@ class ModelTrainer:
                 'auroc': val_auroc
             }
 
-        print(f"Best Validation Acc. = {best_model['acc']} (Epoch = {best_model['epoch']})")
+        print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         filename = os.path.join(self.save_path, 'checkpoint.pth.tar')
         torch.save(best_model, filename)
-        np.save(os.path.join(self.save_path, "y_true_train.npy"), np.array(self.y_true_train))
-        np.save(os.path.join(self.save_path, "y_pred_train.npy"), np.array(self.y_pred_train))
-        np.save(os.path.join(self.save_path, "y_true_val.npy"), np.array(self.y_true_val))
-        np.save(os.path.join(self.save_path, "y_pred_val.npy"), np.array(self.y_pred_val))
+        # np.save(os.path.join(self.save_path, "y_true_train.npy"), np.array(self.y_true_train))
+        # np.save(os.path.join(self.save_path, "y_pred_train.npy"), np.array(self.y_pred_train))
+        # np.save(os.path.join(self.save_path, "y_true_val.npy"), np.array(self.y_true_val))
+        # np.save(os.path.join(self.save_path, "y_pred_val.npy"), np.array(self.y_pred_val))
         print("Finished creating checkpoint.")
 
         return best_model
