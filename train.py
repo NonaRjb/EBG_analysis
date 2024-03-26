@@ -50,8 +50,10 @@ def parse_args():
     parser.add_argument('-b', '--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--lr_scheduler', type=str, default='plateau')
+    parser.add_argument('--weight_decay', type=float, default=0.1)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--split_seed', type=int, default=42)
     return parser.parse_args()
 
 
@@ -61,6 +63,7 @@ if __name__ == "__main__":
     # with wandb.init():
         args = wandb.config
         seed = args.seed
+        split_seed = args.split_seed
         seed_everything(seed)
         dataset_name = args.data
         subject_id = args.subject_id
@@ -70,6 +73,7 @@ if __name__ == "__main__":
         scheduler_name = args.lr_scheduler
         epochs = args.epoch
         optim_name = args.optim_name
+        weight_decay = args.weight_decay
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print("device = ", device)
 
@@ -104,6 +108,8 @@ if __name__ == "__main__":
             path=paths['eeg_data'],
             batch_size=batch_size,
             seed=seed,
+            split_seed=split_seed,
+            augmentation=True,
             device=device, **constants.data_constants
             )
 
@@ -152,18 +158,18 @@ if __name__ == "__main__":
         print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
         model = model.double()
         if optim_name == 'adam':
-            optim = Adam(model.parameters(), lr=lr, weight_decay=0.1)
+            optim = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         elif optim_name == 'adamw':
-            optim = AdamW(model.parameters(), lr=lr, weight_decay=0.1, amsgrad=True)
+            optim = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=True)
         elif optim_name == 'rmsprop':
-            optim = RMSprop(model.parameters(), lr=lr, weight_decay=0.05)
+            optim = RMSprop(model.parameters(), lr=lr, weight_decay=weight_decay)
         elif optim_name == 'sgd':
-            optim = SGD(model.parameters(), lr=lr, momentum=0.1, weight_decay=0.05)
+            optim = SGD(model.parameters(), lr=lr, momentum=0.1, weight_decay=weight_decay)
         else:
             raise NotImplementedError
         
         if scheduler_name == 'plateau':
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=10,
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=50,
                                                      min_lr=0.1 * 1e-7,
                                                      factor=0.1)
         elif scheduler_name == 'multistep':    

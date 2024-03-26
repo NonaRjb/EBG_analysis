@@ -2,7 +2,7 @@ program: /Midgard/home/nonar/EBG_analysis/train.py
 method: grid
 metric:
   goal: maximize
-  name: val_balanced_acc
+  name: val_auroc
 parameters:
   data:
     value: dataset1
@@ -11,7 +11,7 @@ parameters:
   ebg_transform:
     value: tfr_morlet
   eeg:
-    value: lstm
+    value: resnet1d
   dropout:
     value: 0.25
   hidden_size:
@@ -23,19 +23,28 @@ parameters:
   lr:
     value: 0.0001
   lr_scheduler:
-    values:
-      - plateau
-      - multistep
-      - linear
-      - exp
-      - cosine
+    value: plateau
+  weight_decay:
+    value: 0.1
   epoch:
-    value: 300
+    value: 150
   optim_name:
     value: adamw
   seed:
     value: 42
+  split_seed:
+    values: 
+      - 42
+      - 29
+      - 35
+      - 74
+      - 93
+      - 107
+      - 5
+      - 203
+      - 256
+      - 113
   tmin:
-    value: -0.1
+    value: -0.2
   tmax:
     value: 0.3

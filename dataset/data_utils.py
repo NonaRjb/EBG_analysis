@@ -1,9 +1,13 @@
+from typing import Any
 import mne
+import torch
 import scipy.io as scio
 import mat73
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+from typing import Union
 import mne
+
 
 
 def load_ebg1_mat(filename, trials_to_keep):
@@ -18,7 +22,7 @@ def load_ebg1_mat(filename, trials_to_keep):
     indices_air = np.array(trials_to_keep['air'][0][0])
     indices_odor = np.array(trials_to_keep['odor'][0][0])
     indices_all = np.vstack((indices_air, indices_odor))
-    indices_all -= 1
+    indices_all -= 1    # convert MATLAB indices to Python
 
     channels_to_remove = ['Mstd_L', 'Mstd_R', 'Status', 'BR3', 'BL3']
     new_channels = [channels.index(ch) for ch in channels if ch not in channels_to_remove]
@@ -125,3 +129,223 @@ def strided_convolution(image, weight, stride):
     out_strides = (image.strides[0] * stride, image.strides[1] * stride, image.strides[0], image.strides[1])
     windows = as_strided(image, shape=out_shape, strides=out_strides)
     return np.tensordot(windows, weight, axes=((2, 3), (0, 1)))
+
+
+class RandomNoise(object):
+    def __init__(self, mean: float = 0.0, std: float = 1.0, p: float = 0.5) -> None:
+        self.mean = mean
+        self.std = std
+        self.p = p
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        '''
+        Args:
+            x (torch.Tensor): The input EEG signal.
+
+        Returns:
+            torch.Tensor: The output EEG signal after adding random noise.
+        '''
+        if self.p < torch.rand(1):
+            return x
+        if self.std is None:
+            self.std = x.std(dim=-1, keepdims=True) / 4.
+        noise = torch.randn_like(x)
+        noise = (noise + self.mean) * self.std
+        return x + noise
+
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+    
+class TemporalJitter(object):
+    def __init__(self, max_jitter: int = 20, p: float = 0.5, padding: str = 'zero') -> None:
+        self.max_jitter = max_jitter
+        self.p = p
+        self.padding = padding
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        if self.p < torch.rand(1):
+            return x
+        channels, length = x.shape
+        shifts = torch.randint(-self.max_jitter, self.max_jitter + 1, (channels,)).to(x.device)
+        if self.padding == 'same':
+            pass
+        elif self.padding == 'zero':
+            jittered_x = torch.zeros_like(x)
+        else: 
+            raise NotImplementedError
+        for i, shift in enumerate(shifts):
+            if shift == 0:
+                jittered_x[i, :] = x[i, :]
+            elif shift > 0:
+                jittered_x[i, shift:] = x[i, :-shift]
+            else:  # shift < 0
+                jittered_x[i, :shift] = x[i, -shift:]
+        return jittered_x
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
+
+class RandomMask(object):
+    def __init__(self, ratio: float = 0.5, p: float = 0.5) -> None:
+        self.ratio = ratio
+        self.p = p
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        '''
+        Args:
+            x (torch.Tensor): The input EEG signal.
+
+        Returns:
+            torch.Tensor: The output EEG signal after applying a random mask.
+        '''
+        if self.p < torch.rand(1):
+            return x
+        mask = torch.rand_like(x)
+        mask = (mask < self.ratio).to(x.dtype)
+        return x * mask
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+    
+class MapDataset(torch.utils.data.Dataset):
+    """
+    Given a dataset, creates a dataset which applies a mapping function
+    to its items (lazily, only when an item is called).
+
+    Note that data is not cloned/copied from the initial dataset.
+    """
+
+    def __init__(self, dataset, map_fn):
+        self.dataset = dataset
+        self.map = map_fn
+
+    def __getitem__(self, index):
+        if self.map:     
+            x = self.map(self.dataset[index][0]) 
+        else:     
+            x = self.dataset[index][0]  # eeg
+        y = self.dataset[index][1]   # label      
+        return x, y
+
+    def __len__(self):
+        return len(self.dataset)
+    
+
+class MeanStdNormalize:
+    '''
+    Perform z-score normalization on the input data. This class allows the user to define the dimension of normalization and the used statistic.
+
+    .. code-block:: python
+
+        transform = Concatenate([
+            MeanStdNormalize(axis=0)
+        ])
+        # normalize along the first dimension (electrode dimension)
+        transform(torch.randn(32, 128)).shape
+        >>> (32, 128)
+
+        transform = Concatenate([
+            MeanStdNormalize(axis=1)
+        ])
+        # normalize along the second dimension (temproal dimension)
+        transform(torch.randn(32, 128)).shape
+        >>> (32, 128)
+
+    Args:
+        mean (np.array, optional): The mean used in the normalization process, allowing the user to provide mean statistics in :obj:`np.ndarray` format. When statistics are not provided, use the statistics of the current sample for normalization.
+        std (np.array, optional): The standard deviation used in the normalization process, allowing the user to provide tandard deviation statistics in :obj:`np.ndarray` format. When statistics are not provided, use the statistics of the current sample for normalization.
+        axis (int, optional): The dimension to normalize, when no dimension is specified, the entire data is normalized.
+    
+    .. automethod:: __call__
+    '''
+    def __init__(self, mean: Union[np.ndarray, None] = None, std: Union[np.ndarray, None] = None, axis: Union[int, None] = None):
+        self.mean = mean
+        self.std = std
+        self.axis = axis
+
+    def __call__(self, x: np.ndarray):
+        '''
+        Args:
+            x (np.ndarray): The input EEG signals or features.
+
+        Returns:
+            np.ndarray: The normalized results.
+        '''
+        if (self.mean is None) or (self.std is None):
+            if self.axis is None:
+                mean = x.mean()
+                std = x.std()
+            else:
+                mean = x.mean(axis=self.axis, keepdims=True)
+                std = x.std(axis=self.axis, keepdims=True)
+        elif not self.axis is None:
+            shape = [-1] * len(x.shape)
+            shape[self.axis] = 1
+            mean = self.mean.reshape(*shape)
+            std = self.std.reshape(*shape)
+        return (x - mean) / std
+
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+    
+
+class MinMaxNormalize:
+    '''
+    Perform min-max normalization on the input data. This class allows the user to define the dimension of normalization and the used statistic.
+
+    .. code-block:: python
+
+        transform = Concatenate([
+            MinMaxNormalize(axis=0)
+        ])
+        # normalize along the first dimension (electrode dimension)
+        transform(torch.randn(32, 128)).shape
+        >>> (32, 128)
+
+        transform = Concatenate([
+            MinMaxNormalize(axis=1)
+        ])
+        # normalize along the second dimension (temproal dimension)
+        transform(torch.randn(32, 128)).shape
+        >>> (32, 128)
+
+    Args:
+        min (np.array, optional): The minimum used in the normalization process, allowing the user to provide minimum statistics in :obj:`np.ndarray` format. When statistics are not provided, use the statistics of the current sample for normalization.
+        max (np.array, optional): The maximum used in the normalization process, allowing the user to provide maximum statistics in :obj:`np.ndarray` format. When statistics are not provided, use the statistics of the current sample for normalization.
+        axis (int, optional): The dimension to normalize, when no dimension is specified, the entire data is normalized.
+    
+    .. automethod:: __call__
+    '''
+    def __init__(self,
+                 min: Union[np.ndarray, None, float] = None,
+                 max: Union[np.ndarray, None, float] = None,
+                 axis: Union[int, None] = None):
+        self.min = min
+        self.max = max
+        self.axis = axis
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        '''
+        Args:
+            x (np.ndarray): The input EEG signals or features.
+            
+        Returns:
+            np.ndarray: The normalized results.
+        '''
+        if (self.min is None) or (self.max is None):
+            if self.axis is None:
+                min = x.min()
+                max = x.max()
+            else:
+                min = x.min(axis=self.axis, keepdims=True)
+                max = x.max(axis=self.axis, keepdims=True)
+        elif not self.axis is None:
+            shape = [-1] * len(x.shape)
+            shape[self.axis] = 1
+            min = self.min.reshape(*shape)
+            max = self.max.reshape(*shape)
+
+        return (x - min) / (max - min)
+
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+    

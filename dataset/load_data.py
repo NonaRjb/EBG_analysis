@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from torchvision import transforms
 from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedShuffleSplit
 import scipy.io as scio
@@ -10,15 +11,17 @@ from dataset.ebg1_tfr import EBG1TFR
 from dataset.ebg3 import EBG3TFR
 from dataset.source_data_recent import SourceData
 import dataset.data_utils as data_utils
+from dataset.data_utils import RandomNoise, RandomMask, MeanStdNormalize, MinMaxNormalize, TemporalJitter
 
 
-def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, **kwargs):
+def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: int, device: str, augmentation: bool = False, **kwargs):
+    
     g = torch.Generator().manual_seed(seed)
 
     if dataset_name == 'dataset1':
         data = EBG1(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'], fmax=kwargs['fmax'],
                     binary=kwargs['binary'], transform=kwargs['ebg_transform'], freqs=kwargs['tfr_freqs'],
-                    include_eeg=kwargs['include_eeg'], shuffle_labels=kwargs['shuffle_labels'])
+                    modality=kwargs['modality'], shuffle_labels=kwargs['shuffle_labels'])
     elif dataset_name == 'dataset1_tfr':
         data = EBG1TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'])
@@ -40,7 +43,7 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, 
 
 
     train_data, val_data, test_data = torch.utils.data.random_split(
-        data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(seed))
+        data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(split_seed))
 
     # train_labels = list(np.array(train_data.dataset.labels)[train_data.indices])
     # count_0 = train_labels.count(0.)
@@ -49,6 +52,26 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, device: str, 
     # sample_weights = np.array([class_weights[int(t)] for t in train_labels])
     # sample_weights = torch.from_numpy(sample_weights).double()
     # sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
+    if augmentation:
+        data_transforms = transforms.Compose([
+            MinMaxNormalize(),
+            RandomNoise(mean=0.0, std=1.0, p=0.6), # p = 0.6 (for 'both' and 'ebg')
+            RandomMask(ratio=0.6, p=0.3), # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
+            # TemporalJitter(max_jitter=20, p=0.5)
+        ])
+        train_data = data_utils.MapDataset(train_data, data_transforms)
+        val_data_transforms = transforms.Compose([
+            MinMaxNormalize()
+        ])
+        val_data = data_utils.MapDataset(val_data, val_data_transforms)
+        test_data = data_utils.MapDataset(test_data, val_data_transforms)
+    else:
+        data_transforms = transforms.Compose([
+            MinMaxNormalize()
+        ])
+        # train_data = data_utils.MapDataset(train_data, data_transforms)
+        # val_data = data_utils.MapDataset(val_data, data_transforms)
+        # test_data = data_utils.MapDataset(test_data, data_transforms)
 
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False,
                                    drop_last=False,

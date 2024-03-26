@@ -8,10 +8,10 @@ data_constants = {
     'fmax': None,
     'binary': True,
     'train_size': 0.8,
-    'val_size': 0.1,
+    'val_size': 0.2,
     'ebg_transform': None,
     'shuffle_labels': False,
-    'include_eeg': False,
+    'modality': 'ebg',
     'tfr_freqs': np.linspace(20, 100, 160),
     'baseline_type': 'zscore'
 }
@@ -36,4 +36,5 @@ model_constants = {
     'tfrnet': {},
     'resnet1d': {'n_channels': 4, 'n_samples': 256, 'net_filter_size':[16, 16, 32, 32, 64], 'net_seq_length':[256, 128, 64, 32, 16], 'n_classes':2 , 'kernel_size':31, 'dropout_rate':0.5}
 }
+
 
