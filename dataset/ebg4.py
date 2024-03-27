@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 import os
 import random
 import dataset.data_utils as data_utils
-from dataset.data_utils import load_source_ebg4
+from dataset.data_utils import load_ebg4
 
 
 class EBG4(Dataset):
@@ -15,6 +15,7 @@ class EBG4(Dataset):
             tmax: float = None,
             binary: bool = True,
             data_type: str = 'source',
+            modality: str = 'both',
             shuffle_labels: bool = False,
             seed: int = 42
     ):
@@ -32,14 +33,21 @@ class EBG4(Dataset):
         self.class_weight = None
 
         for i, subject in enumerate(subjects):
-            file = os.path.join(root_path, str(subject), filename)
-            source_data, label, time_vec, fs = load_source_ebg4(file)
+            source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type)
 
             if self.fs is None:
                 self.fs = float(fs)
 
             if self.time_vec is None:
                 self.time_vec = time_vec
+
+            if data_type == 'sensor' or data_type == 'sensor_ica':
+                if modality == 'eeg':
+                    source_data = source_data[:, :64, :]
+                elif modality == 'ebg':
+                    source_data = source_data[:, 64:, :]
+                else:
+                    pass
 
             if self.source_data is None:
                 self.source_data = source_data
