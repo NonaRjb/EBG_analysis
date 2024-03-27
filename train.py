@@ -37,7 +37,7 @@ def create_readme(config, path):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default=None)
-    parser.add_argument('--data', type=str, default='source_data_recent')
+    parser.add_argument('--data', type=str, default='ebg4_source')
     parser.add_argument('--tmin', type=float, default=None)
     parser.add_argument('--tmax', type=float, default=None)
     parser.add_argument('--ebg_transform', type=str, default='tfr_morlet')
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
         if dataset_name == 'dataset3_tfr':
             local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
-        elif dataset_name == 'source_data_recent':
+        elif 'ebg4' in dataset_name:
             local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
 
         paths = {

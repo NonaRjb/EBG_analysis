@@ -106,7 +106,7 @@ def load_sensor_ebg4(filename):
     print(f"********** loading sensor data from {filename} **********")
     data_struct = mat73.loadmat(filename)
     data = np.asarray(data_struct['data_eeg']['trial'])
-    time = data_struct['data_eeg']['time']
+    time = data_struct['data_eeg']['time'][0]
     labels = data_struct['data_eeg']['trialinfo'].squeeze()
     labels = labels[:, 0]
     fs = 512
@@ -118,7 +118,7 @@ def load_sensor_ica_ebg4(filename):
     print(f"********** loading sensor data from {filename} **********")
     data_struct = mat73.loadmat(filename)
     data = np.asarray(data_struct['data_eeg_ica']['trial'])
-    time = data_struct['data_eeg_ica']['time']
+    time = data_struct['data_eeg_ica']['time'][0]
     labels = data_struct['data_eeg_ica']['trialinfo'].squeeze()
     labels = labels[:, 0]
     fs = 512

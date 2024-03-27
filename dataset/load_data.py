@@ -14,7 +14,8 @@ import dataset.data_utils as data_utils
 from dataset.data_utils import RandomNoise, RandomMask, MeanStdNormalize, MinMaxNormalize, TemporalJitter
 
 
-def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: int, device: str, augmentation: bool = False, **kwargs):
+def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: int, device: str,
+         augmentation: bool = False, **kwargs):
     
     g = torch.Generator().manual_seed(seed)
 
@@ -29,8 +30,15 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
         data = EBG3TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'],
                        baseline_type=kwargs['baseline_type'])
-    elif dataset_name == 'source_data_recent':
-        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'])
+    elif dataset_name == 'ebg4_source':
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
+                    data_type="source")
+    elif dataset_name == 'ebg4_sensor':
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
+                    data_type="sensor", modality=kwargs["modality"])
+    elif dataset_name == 'ebg4_sensor_ica':
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
+                    data_type="sensor_ica", modality=kwargs["modality"])
     else:
         raise NotImplementedError
 
