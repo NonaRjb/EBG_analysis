@@ -111,7 +111,6 @@ class EBG1(Dataset):
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
         self.data = self.data[..., self.t_min:self.t_max] - self.baseline
 
-
     def __len__(self):
         return len(self.labels)
 

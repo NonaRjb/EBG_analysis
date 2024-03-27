@@ -7,7 +7,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from typing import Union
 import mne
-
+import os
 
 
 def load_ebg1_mat(filename, trials_to_keep):
@@ -22,7 +22,7 @@ def load_ebg1_mat(filename, trials_to_keep):
     indices_air = np.array(trials_to_keep['air'][0][0])
     indices_odor = np.array(trials_to_keep['odor'][0][0])
     indices_all = np.vstack((indices_air, indices_odor))
-    indices_all -= 1    # convert MATLAB indices to Python
+    indices_all -= 1  # convert MATLAB indices to Python
 
     channels_to_remove = ['Mstd_L', 'Mstd_R', 'Status', 'BR3', 'BL3']
     new_channels = [channels.index(ch) for ch in channels if ch not in channels_to_remove]
@@ -83,7 +83,50 @@ def load_ebg3_tfr(filename):
     return ebg_data, labels, time, freq
 
 
-def load_source_data_recent(filename):
+def load_ebg4(root, subject_id, data_type):
+    if data_type == 'source':
+        filename = "source_data.mat"
+        file = os.path.join(root, str(subject_id), filename)
+        data, labels, time, fs = load_source_ebg4(file)
+    elif data_type == "sensor":
+        filename = "preprocessed_data.mat"
+        file = os.path.join(root, str(subject_id), filename)
+        data, labels, time, fs = load_sensor_ebg4(file)
+    elif data_type == "sensor_ica":
+        filename = "preprocessed_data_ica.mat"
+        file = os.path.join(root, str(subject_id), filename)
+        data, labels, time, fs = load_sensor_ica_ebg4(file)
+    else:
+        raise NotImplementedError
+
+    return data, labels, time, fs
+
+
+def load_sensor_ebg4(filename):
+    print(f"********** loading sensor data from {filename} **********")
+    data_struct = mat73.loadmat(filename)
+    data = np.asarray(data_struct['data_eeg']['trial'])
+    time = data_struct['data_eeg']['time']
+    labels = data_struct['data_eeg']['trialinfo'].squeeze()
+    labels = labels[:, 0]
+    fs = 512
+
+    return data, labels, time, fs
+
+
+def load_sensor_ica_ebg4(filename):
+    print(f"********** loading sensor data from {filename} **********")
+    data_struct = mat73.loadmat(filename)
+    data = np.asarray(data_struct['data_eeg_ica']['trial'])
+    time = data_struct['data_eeg_ica']['time']
+    labels = data_struct['data_eeg_ica']['trialinfo'].squeeze()
+    labels = labels[:, 0]
+    fs = 512
+
+    return data, labels, time, fs
+
+
+def load_source_ebg4(filename):
     print(f"********** loading source data from {filename} **********")
 
     mat73_files = [21, 22, 23, 24, 25]
@@ -136,6 +179,7 @@ class RandomNoise(object):
         self.mean = mean
         self.std = std
         self.p = p
+
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         '''
         Args:
@@ -152,15 +196,16 @@ class RandomNoise(object):
         noise = (noise + self.mean) * self.std
         return x + noise
 
-
     def __repr__(self):
         return f"{self.__class__.__name__}()"
-    
+
+
 class TemporalJitter(object):
     def __init__(self, max_jitter: int = 20, p: float = 0.5, padding: str = 'zero') -> None:
         self.max_jitter = max_jitter
         self.p = p
         self.padding = padding
+
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         if self.p < torch.rand(1):
             return x
@@ -170,7 +215,7 @@ class TemporalJitter(object):
             pass
         elif self.padding == 'zero':
             jittered_x = torch.zeros_like(x)
-        else: 
+        else:
             raise NotImplementedError
         for i, shift in enumerate(shifts):
             if shift == 0:
@@ -180,6 +225,7 @@ class TemporalJitter(object):
             else:  # shift < 0
                 jittered_x[i, :shift] = x[i, -shift:]
         return jittered_x
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
@@ -188,6 +234,7 @@ class RandomMask(object):
     def __init__(self, ratio: float = 0.5, p: float = 0.5) -> None:
         self.ratio = ratio
         self.p = p
+
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         '''
         Args:
@@ -201,9 +248,11 @@ class RandomMask(object):
         mask = torch.rand_like(x)
         mask = (mask < self.ratio).to(x.dtype)
         return x * mask
+
     def __repr__(self):
         return f"{self.__class__.__name__}()"
-    
+
+
 class MapDataset(torch.utils.data.Dataset):
     """
     Given a dataset, creates a dataset which applies a mapping function
@@ -217,16 +266,16 @@ class MapDataset(torch.utils.data.Dataset):
         self.map = map_fn
 
     def __getitem__(self, index):
-        if self.map:     
-            x = self.map(self.dataset[index][0]) 
-        else:     
+        if self.map:
+            x = self.map(self.dataset[index][0])
+        else:
             x = self.dataset[index][0]  # eeg
-        y = self.dataset[index][1]   # label      
+        y = self.dataset[index][1]  # label
         return x, y
 
     def __len__(self):
         return len(self.dataset)
-    
+
 
 class MeanStdNormalize:
     '''
@@ -255,7 +304,9 @@ class MeanStdNormalize:
     
     .. automethod:: __call__
     '''
-    def __init__(self, mean: Union[np.ndarray, None] = None, std: Union[np.ndarray, None] = None, axis: Union[int, None] = None):
+
+    def __init__(self, mean: Union[np.ndarray, None] = None, std: Union[np.ndarray, None] = None,
+                 axis: Union[int, None] = None):
         self.mean = mean
         self.std = std
         self.axis = axis
@@ -282,10 +333,9 @@ class MeanStdNormalize:
             std = self.std.reshape(*shape)
         return (x - mean) / std
 
-
     def __repr__(self):
         return f"{self.__class__.__name__}()"
-    
+
 
 class MinMaxNormalize:
     '''
@@ -314,6 +364,7 @@ class MinMaxNormalize:
     
     .. automethod:: __call__
     '''
+
     def __init__(self,
                  min: Union[np.ndarray, None, float] = None,
                  max: Union[np.ndarray, None, float] = None,
@@ -345,7 +396,5 @@ class MinMaxNormalize:
 
         return (x - min) / (max - min)
 
-
     def __repr__(self):
         return f"{self.__class__.__name__}()"
-    

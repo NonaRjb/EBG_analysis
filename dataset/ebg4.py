@@ -5,15 +5,16 @@ from torch.utils.data import Dataset
 import os
 import random
 import dataset.data_utils as data_utils
-from dataset.data_utils import load_source_data_recent
+from dataset.data_utils import load_source_ebg4
 
 
-class SourceData(Dataset):
+class EBG4(Dataset):
     def __init__(
             self, root_path: str,
             tmin: float = None,
             tmax: float = None,
             binary: bool = True,
+            data_type: str = 'source',
             shuffle_labels: bool = False,
             seed: int = 42
     ):
@@ -31,8 +32,8 @@ class SourceData(Dataset):
         self.class_weight = None
 
         for i, subject in enumerate(subjects):
-            file = os.path.join(root_path, str(subject), "source_data.mat")
-            source_data, label, time_vec, fs = load_source_data_recent(file)
+            file = os.path.join(root_path, str(subject), filename)
+            source_data, label, time_vec, fs = load_source_ebg4(file)
 
             if self.fs is None:
                 self.fs = float(fs)
@@ -85,13 +86,13 @@ class SourceData(Dataset):
     def __getitem__(self, item):
         if torch.is_tensor(item):
             item = item.tolist()
-        sample = self.data[item, ...]
+        sample = torch.from_numpy(self.data[item, ...])
         return sample, self.labels[item]
 
 
 if __name__ == "__main__":
-    data_args = {'tmin': -0.2, 'tmax': 0.3}
-    ebg_dataset = SourceData(root_path='/Volumes/T5 EVO/Odor_Intensity/', **data_args)
+    data_args = {'tmin': -0.2, 'tmax': 0.3, 'data_type': 'sensor'}
+    ebg_dataset = EBG4(root_path='/Volumes/T5 EVO/Odor_Intensity/', **data_args)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_ebg.npy'), ebg_dataset.ebg)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_labels.npy'),
     #         np.array(ebg_dataset.labels))

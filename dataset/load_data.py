@@ -9,7 +9,7 @@ import os
 from dataset.ebg1 import EBG1
 from dataset.ebg1_tfr import EBG1TFR
 from dataset.ebg3 import EBG3TFR
-from dataset.source_data_recent import SourceData
+from dataset.ebg4 import EBG4
 import dataset.data_utils as data_utils
 from dataset.data_utils import RandomNoise, RandomMask, MeanStdNormalize, MinMaxNormalize, TemporalJitter
 
@@ -30,7 +30,7 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'],
                        baseline_type=kwargs['baseline_type'])
     elif dataset_name == 'source_data_recent':
-        data = SourceData(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'])
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'])
     else:
         raise NotImplementedError
 
