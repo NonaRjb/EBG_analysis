@@ -43,9 +43,14 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
         raise NotImplementedError
 
     n_time_samples = len(data.time_vec)
-    train_size = int(kwargs['train_size'] * len(data))
-    val_size = int(kwargs['val_size'] * len(data))
-    test_size = int(len(data) - train_size - val_size)
+    if kwargs['train_size'] + kwargs['val_size'] == 1:
+        train_size = int(kwargs['train_size'] * len(data))
+        val_size = int(len(data) - train_size)
+        test_size = 0
+    else:
+        train_size = int(kwargs['train_size'] * len(data))
+        val_size = int(kwargs['val_size'] * len(data))
+        test_size = int(len(data) - train_size - val_size)
 
     print(f"*** train set size = {train_size} | val set size = {val_size} | test set size = {test_size} ***")
 
@@ -61,17 +66,17 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
     # sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
     if augmentation:
         data_transforms = transforms.Compose([
-            MinMaxNormalize(),
-            RandomNoise(mean=0.0, std=1.0, p=0.6), # p = 0.6 (for 'both' and 'ebg')
-            RandomMask(ratio=0.6, p=0.3), # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
+            # MinMaxNormalize(),
+            RandomNoise(mean=0.0, std=None, p=0.5), # p = 0.6 (for 'both' and 'ebg')
+            RandomMask(ratio=0.5, p=0.3), # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
             # TemporalJitter(max_jitter=20, p=0.5)
         ])
         train_data = data_utils.MapDataset(train_data, data_transforms)
         val_data_transforms = transforms.Compose([
             MinMaxNormalize()
         ])
-        val_data = data_utils.MapDataset(val_data, val_data_transforms)
-        test_data = data_utils.MapDataset(test_data, val_data_transforms)
+        # val_data = data_utils.MapDataset(val_data, val_data_transforms)
+        # test_data = data_utils.MapDataset(test_data, val_data_transforms)
     else:
         data_transforms = transforms.Compose([
             MinMaxNormalize()

@@ -74,6 +74,7 @@ class ModelTrainer:
                 y_pred.extend(torch.sigmoid(preds))
 
                 scaler.scale(loss_classification).backward()
+                # nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 scaler.step(self.optimizer)
                 scaler.update()
 

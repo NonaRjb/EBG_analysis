@@ -81,6 +81,7 @@ if __name__ == "__main__":
             local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
         elif 'ebg4' in dataset_name:
             local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
+            cluster_data_path = os.path.join(cluster_data_path, 'Odor_Intensity')
 
         paths = {
             "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
@@ -169,7 +170,7 @@ if __name__ == "__main__":
             raise NotImplementedError
         
         if scheduler_name == 'plateau':
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=50,
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=200,
                                                      min_lr=0.1 * 1e-7,
                                                      factor=0.1)
         elif scheduler_name == 'multistep':    
