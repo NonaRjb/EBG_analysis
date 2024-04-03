@@ -11,6 +11,7 @@ import os
 
 
 def load_ebg1_mat(filename, trials_to_keep):
+    print(f"********** loading sensor data from {filename} **********")
     data_struct = scio.loadmat(filename)
 
     data = np.asarray(list(data_struct['data_eeg']['trial'][0][0][0]))
@@ -32,7 +33,7 @@ def load_ebg1_mat(filename, trials_to_keep):
     eeg_data = data[:, :64, :]
     ebg_data = data[:, 64:, :]
 
-    return eeg_data, ebg_data, labels, time, fs
+    return data, labels, time, fs
 
 
 def load_ebg1_tfr(filename_air, filename_odor, n_subjects=29):

@@ -17,7 +17,7 @@ os.environ["WANDB_API_KEY"] = "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 os.environ['WANDB_START_METHOD'] = 'thread'
 cluster_data_path = '/local_storage/datasets/nonar/ebg/'
 cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-local_data_path = "/Users/nonarajabi/Desktop/KTH/Smell/Novel_Bulb_measure/data/"
+local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
 
 
@@ -77,11 +77,11 @@ if __name__ == "__main__":
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print("device = ", device)
 
-        if dataset_name == 'dataset3_tfr':
-            local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
-        elif 'ebg4' in dataset_name:
-            local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
-            cluster_data_path = os.path.join(cluster_data_path, 'Odor_Intensity')
+        # if dataset_name == 'ebg3_tfr':
+        #     local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
+        # elif 'ebg4' in dataset_name:
+        #     local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
+        #     cluster_data_path = os.path.join(cluster_data_path, 'Odor_Intensity')
 
         paths = {
             "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,

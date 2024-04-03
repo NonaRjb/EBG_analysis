@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler, ConcatDataset
 from torchvision import transforms
 from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -10,35 +10,42 @@ from dataset.ebg1 import EBG1
 from dataset.ebg1_tfr import EBG1TFR
 from dataset.ebg3 import EBG3TFR
 from dataset.ebg4 import EBG4
+from dataset.ebg_all import EBG_all
 import dataset.data_utils as data_utils
 from dataset.data_utils import RandomNoise, RandomMask, MeanStdNormalize, MinMaxNormalize, TemporalJitter
 
 
 def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: int, device: str,
          augmentation: bool = False, **kwargs):
-    
     g = torch.Generator().manual_seed(seed)
 
-    if dataset_name == 'dataset1':
+    if dataset_name == 'ebg1':
+        path = os.path.join(path, "ebg1")
         data = EBG1(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'], fmax=kwargs['fmax'],
-                    binary=kwargs['binary'], transform=kwargs['ebg_transform'], freqs=kwargs['tfr_freqs'],
-                    modality=kwargs['modality'], shuffle_labels=kwargs['shuffle_labels'])
-    elif dataset_name == 'dataset1_tfr':
+                    binary=kwargs['binary'], freqs=kwargs['tfr_freqs'],
+                    modality=kwargs['modality'])
+    elif dataset_name == 'ebg1_tfr':
         data = EBG1TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'])
-    elif dataset_name == 'dataset3_tfr':
+    elif dataset_name == 'ebg3_tfr':
         data = EBG3TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'],
                        baseline_type=kwargs['baseline_type'])
     elif dataset_name == 'ebg4_source':
+        path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
                     data_type="source")
     elif dataset_name == 'ebg4_sensor':
+        path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
                     data_type="sensor", modality=kwargs["modality"])
     elif dataset_name == 'ebg4_sensor_ica':
+        path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
                     data_type="sensor_ica", modality=kwargs["modality"])
+    elif dataset_name == "ebg_all":
+        data = EBG_all(root_path=path, tmin=kwargs["tmin"], tmax=kwargs["tmax"], binary=kwargs["binary"],
+                       modality=kwargs["modality"])
     else:
         raise NotImplementedError
 
@@ -57,9 +64,15 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
     train_data, val_data, test_data = torch.utils.data.random_split(
         data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(split_seed))
 
-    # train_labels = list(np.array(train_data.dataset.labels)[train_data.indices])
-    # count_0 = train_labels.count(0.)
-    # count_1 = train_labels.count(1.)
+    train_labels = list(np.array(train_data.dataset.labels)[train_data.indices])
+    count_0 = train_labels.count(0.)
+    count_1 = train_labels.count(1.)
+    print(f"Train Data Proportions: class 0 = {count_0}, class 1 = {count_1}")
+
+    val_labels = list(np.array(val_data.dataset.labels)[val_data.indices])
+    count_0 = val_labels.count(0.)
+    count_1 = val_labels.count(1.)
+    print(f"Train Data Proportions: class 0 = {count_0}, class 1 = {count_1}")
     # class_weights = (count_0 + count_1) / np.array([count_0, count_1])
     # sample_weights = np.array([class_weights[int(t)] for t in train_labels])
     # sample_weights = torch.from_numpy(sample_weights).double()
@@ -67,8 +80,8 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
     if augmentation:
         data_transforms = transforms.Compose([
             # MinMaxNormalize(),
-            RandomNoise(mean=0.0, std=None, p=0.5), # p = 0.6 (for 'both' and 'ebg')
-            RandomMask(ratio=0.5, p=0.3), # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
+            RandomNoise(mean=0.0, std=None, p=0.5),  # p = 0.6 (for 'both' and 'ebg')
+            RandomMask(ratio=0.5, p=0.3),  # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
             # TemporalJitter(max_jitter=20, p=0.5)
         ])
         train_data = data_utils.MapDataset(train_data, data_transforms)

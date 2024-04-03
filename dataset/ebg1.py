@@ -16,11 +16,8 @@ class EBG1(Dataset):
             fmin: float = None,
             fmax: float = None,
             binary: bool = True,
-            transform: str = None,
             freqs: np.ndarray = None,
-            modality: str = 'ebg',
-            shuffle_labels: bool = False,
-            seed: int = 42
+            modality: str = 'ebg'
     ):
 
         self.root_path = root_path
@@ -31,20 +28,18 @@ class EBG1(Dataset):
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2
-        self.eeg = None
-        self.ebg = None
+        self.init_data = None
         self.labels = None
         self.subject_id = None
         self.fs = None
         self.time_vec = None
         self.class_weight = None
-        self.transform = transform
         self.freqs = freqs
         self.modality = modality
 
         for i, recording in enumerate(recordings):
             file = os.path.join(root_path, recording)
-            eeg, ebg, label, time_vec, fs = load_ebg1_mat(file, indices_to_keep[0][i])
+            init_data, label, time_vec, fs = load_ebg1_mat(file, indices_to_keep[0][i])
 
             if self.fs is None:
                 self.fs = fs.astype(float)
@@ -52,14 +47,19 @@ class EBG1(Dataset):
             if self.time_vec is None:
                 self.time_vec = time_vec
 
-            if self.eeg is None:
-                self.eeg = eeg
-                self.ebg = ebg
+            if modality == 'eeg':
+                init_data = init_data[:, :64, :]
+            elif modality == 'ebg':
+                init_data = init_data[:, 64:, :]
+            else:
+                pass
+
+            if self.init_data is None:
+                self.init_data = init_data
                 self.labels = np.expand_dims(label, axis=1)
                 self.subject_id = i * np.ones((len(label), 1))
             else:
-                self.eeg = np.vstack((self.eeg, eeg))
-                self.ebg = np.vstack((self.ebg, ebg))
+                self.init_data = np.vstack((self.init_data, init_data))
                 self.labels = np.vstack((self.labels, np.expand_dims(label, axis=1)))
                 self.subject_id = np.vstack((self.subject_id, i * np.ones((len(label), 1))))
 
@@ -99,15 +99,7 @@ class EBG1(Dataset):
             class_1_count = new_labels.count(1.)
             self.class_weight = torch.tensor(class_0_count/class_1_count)
 
-        if self.modality == 'ebg':
-            self.data = self.ebg
-        elif self.modality == 'eeg':
-            self.data = self.eeg
-        elif self.modality == 'both':
-            self.data = np.concatenate((self.eeg, self.ebg), axis=1)
-        else:
-            self.data = self.ebg
-
+        self.data = self.init_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
         self.data = self.data[..., self.t_min:self.t_max] - self.baseline
 

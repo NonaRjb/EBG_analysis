@@ -1,10 +1,7 @@
 import numpy as np
-import scipy.io as scio
 import torch
 from torch.utils.data import Dataset
 import os
-import random
-import dataset.data_utils as data_utils
 from dataset.data_utils import load_ebg4
 
 
