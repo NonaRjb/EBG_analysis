@@ -79,9 +79,6 @@ if __name__ == "__main__":
 
         # if dataset_name == 'ebg3_tfr':
         #     local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
-        # elif 'ebg4' in dataset_name:
-        #     local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
-        #     cluster_data_path = os.path.join(cluster_data_path, 'Odor_Intensity')
 
         paths = {
             "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
