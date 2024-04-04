@@ -68,17 +68,22 @@ class EBG4(Dataset):
         self.baseline_max = np.abs(self.time_vec - self.baseline_max).argmin()
         self.time_vec = self.time_vec[self.t_min:self.t_max]
 
-        if intensity: 
-             self.labels = self.labels[self.labels != 64]
-             self.source_data = self.source_data[self.labels != 64] 
-             new_labels = [0. if (y == 1 or y == 2 or y == 4) else 1. for y in self.labels]
+        if intensity:
+            self.source_data = self.source_data[self.labels.squeeze() != 64, ...]
+            self.labels = self.labels[self.labels != 64]
+            new_labels = [0. if (y == 1 or y == 2 or y == 4) else 1. for y in self.labels]
+            self.labels = new_labels
+            class_0_count = new_labels.count(0.)
+            class_1_count = new_labels.count(1.)
+            print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
+            self.class_weight = torch.tensor(class_0_count / class_1_count)
         elif binary:
             new_labels = [1. if y == 64 else 0. for y in self.labels]
             self.labels = new_labels
             class_0_count = new_labels.count(0.)
             class_1_count = new_labels.count(1.)
             print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
-            self.class_weight = torch.tensor(class_0_count/class_1_count)
+            self.class_weight = torch.tensor(class_0_count / class_1_count)
 
         self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
@@ -96,7 +101,7 @@ class EBG4(Dataset):
 
 if __name__ == "__main__":
     data_args = {'tmin': -0.2, 'tmax': 0.3, 'data_type': 'sensor_ica', 'modality': 'ebg', 'intensity': True}
-    ebg_dataset = EBG4(root_path='/Volumes/T5 EVO/Odor_Intensity/', **data_args)
+    ebg_dataset = EBG4(root_path='/Volumes/T5 EVO/Smell/ebg4/', **data_args)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_ebg.npy'), ebg_dataset.ebg)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_labels.npy'),
     #         np.array(ebg_dataset.labels))
