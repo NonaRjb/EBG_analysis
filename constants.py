@@ -6,12 +6,14 @@ data_constants = {
     'tmax': 0.25,
     'fmin': None,
     'fmax': None,
-    'binary': True,
+    'binary': False,
     'train_size': 0.8,
     'val_size': 0.2,
     'ebg_transform': None,
     'shuffle_labels': False,
     'modality': 'ebg',
+    'intensity': False,
+    'n_classes': 7,
     'tfr_freqs': np.linspace(20, 100, 160),
     'baseline_type': 'zscore'
 }

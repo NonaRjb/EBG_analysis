@@ -116,6 +116,7 @@ if __name__ == "__main__":
 
         # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
         print("EEG sequence length = ", n_time_samples)
+        print(f"Training on {constants.data_constants['n_classes']} classes")
 
         if args.dropout is not None:
             constants.model_constants['lstm']['dropout'] = args.dropout
@@ -185,7 +186,7 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError
         
-        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs, save_path=paths['save_path'],
+        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs, n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
                                weights=None, device=device, scheduler=scheduler)
         best_model = trainer.train(train_loader, val_loader)
         metrics['loss'].append(best_model['loss'])

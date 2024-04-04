@@ -17,6 +17,7 @@ class ModelTrainer:
             optimizer: torch.optim.Optimizer,
             weights: torch.Tensor,
             n_epochs: int,
+            n_classes: int,
             scheduler,
             save_path, device='cuda'
     ):
@@ -24,9 +25,14 @@ class ModelTrainer:
         self.device = device
 
         self.model = model.to(device)
-        self.loss_cls = nn.BCEWithLogitsLoss().to(device)
-        self.accuracy = Accuracy(task='binary').to(self.device)
-        self.auroc = AUROC(task="binary")
+        if n_classes == 2:
+            self.loss_cls = nn.BCEWithLogitsLoss().to(self.device)
+            self.accuracy = Accuracy(task='binary').to(self.device)
+            self.auroc = AUROC(task="binary")
+        else:
+            self.loss_cls = nn.CrossEntropyLoss().to(self.device)
+            self.accuracy = Accuracy(task='multiclass', num_classes=n_classes, top_k=1).to(self.device)
+            self.auroc = AUROC(task="multiclass", num_classes=n_classes)
         self.optimizer = optimizer
         self.scheduler = scheduler
 

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import os
+import math
 from dataset.data_utils import load_ebg4
 
 
@@ -84,6 +85,10 @@ class EBG4(Dataset):
             class_1_count = new_labels.count(1.)
             print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
             self.class_weight = torch.tensor(class_0_count / class_1_count)
+        else:
+            new_labels = [math.log2(y) for y in self.labels]
+            self.labels = new_labels
+            print(f"new_labels = {set(new_labels)}")
 
         self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
