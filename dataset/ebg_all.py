@@ -15,7 +15,7 @@ def add_ebg4(root_path, modality, tmin, tmax, baseline_min, baseline_max, binary
     subject_id = None
     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
     for i, subject in enumerate(subjects):
-        source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type="sensor_ica")
+        source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type="sensor")
 
         if Fs is None:
             Fs = float(fs)

@@ -193,6 +193,8 @@ class RandomNoise(object):
             return x
         if self.std is None:
             self.std = x.std(dim=-1, keepdims=True) / 4.
+        if self.mean is None:
+            self.mean = x.mean(dim=-1, keepdims=True)
         noise = torch.randn_like(x)
         noise = (noise + self.mean) * self.std
         return x + noise

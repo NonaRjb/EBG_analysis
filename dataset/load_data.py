@@ -72,7 +72,7 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
     val_labels = list(np.array(val_data.dataset.labels)[val_data.indices])
     count_0 = val_labels.count(0.)
     count_1 = val_labels.count(1.)
-    print(f"Train Data Proportions: class 0 = {count_0}, class 1 = {count_1}")
+    print(f"Val Data Proportions: class 0 = {count_0}, class 1 = {count_1}")
     # class_weights = (count_0 + count_1) / np.array([count_0, count_1])
     # sample_weights = np.array([class_weights[int(t)] for t in train_labels])
     # sample_weights = torch.from_numpy(sample_weights).double()
@@ -80,9 +80,9 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
     if augmentation:
         data_transforms = transforms.Compose([
             # MinMaxNormalize(),
-            RandomNoise(mean=0.0, std=None, p=0.5),  # p = 0.6 (for 'both' and 'ebg')
-            RandomMask(ratio=0.5, p=0.3),  # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
-            # TemporalJitter(max_jitter=20, p=0.5)
+            RandomNoise(mean=None, std=None, p=0.6),  # p = 0.6 (for 'both' and 'ebg')
+            RandomMask(ratio=0.75, p=0.4),  # ratio=0.75 and p=0.3 for 'both', ratio=0.6 and p=0.3 for 'ebg'
+            TemporalJitter(max_jitter=100, p=0.4)
         ])
         train_data = data_utils.MapDataset(train_data, data_transforms)
         val_data_transforms = transforms.Compose([
