@@ -92,7 +92,7 @@ if __name__ == "__main__":
         while os.path.exists(os.path.join(paths["save_path"], directory_name + str(cnt))):
             cnt += 1
         paths["save_path"] = os.path.join(paths["save_path"], directory_name + str(cnt))
-        os.makedirs(paths["save_path"])
+        os.makedirs(paths["save_path"], exist_ok=True)
         print(f"Directory '{directory_name}' created.")
         create_readme(wandb.config, path=paths['save_path'])
 

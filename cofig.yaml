@@ -5,13 +5,13 @@ metric:
   name: val_auroc
 parameters:
   data:
-    value: ebg_all
+    value: ebg4_source
   subject_id:
-    value: 0
+    value: 3
   ebg_transform:
     value: tfr_morlet
   eeg:
-    value: resnet1d
+    value: eegnet1d
   dropout:
     value: 0.25
   hidden_size:
@@ -27,7 +27,7 @@ parameters:
   weight_decay:
     value: 0.1
   epoch:
-    value: 300
+    value: 1000
   optim_name:
     value: adamw
   seed:
