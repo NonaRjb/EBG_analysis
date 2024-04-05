@@ -107,7 +107,7 @@ if __name__ == "__main__":
             batch_size=batch_size,
             seed=seed,
             split_seed=split_seed,
-            augmentation=True,
+            augmentation=False,
             device=device, **constants.data_constants
             )
 
@@ -183,7 +183,8 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError
         
-        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs, n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
+        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs,
+                               n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
                                weights=None, device=device, scheduler=scheduler)
         best_model = trainer.train(train_loader, val_loader)
         metrics['loss'].append(best_model['loss'])
