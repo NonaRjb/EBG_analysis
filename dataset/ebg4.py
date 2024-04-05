@@ -15,10 +15,14 @@ class EBG4(Dataset):
             data_type: str = 'source',
             modality: str = 'both',
             intensity: bool = False,
+            pick_subjects: int = 0
     ):
 
         self.root_path = root_path
-        subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+        if pick_subjects == 0:
+            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+        else:
+            subjects = [pick_subjects]
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2

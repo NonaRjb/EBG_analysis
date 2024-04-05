@@ -15,7 +15,7 @@ import dataset.data_utils as data_utils
 from dataset.data_utils import RandomNoise, RandomMask, MeanStdNormalize, MinMaxNormalize, TemporalJitter
 
 
-def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: int, device: str,
+def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: int, split_seed: int, device: str,
          augmentation: bool = False, **kwargs):
     g = torch.Generator().manual_seed(seed)
 
@@ -34,15 +34,17 @@ def load(dataset_name: str, path: str, batch_size: int, seed: int, split_seed: i
     elif dataset_name == 'ebg4_source':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
-                    data_type="source", intensity=kwargs['intensity'])
+                    data_type="source", intensity=kwargs['intensity'], pick_subjects=subject_id)
     elif dataset_name == 'ebg4_sensor':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
-                    data_type="sensor", modality=kwargs["modality"], intensity=kwargs['intensity'])
+                    data_type="sensor", modality=kwargs["modality"], intensity=kwargs['intensity'],
+                    pick_subjects=subject_id)
     elif dataset_name == 'ebg4_sensor_ica':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
-                    data_type="sensor_ica", modality=kwargs["modality"], intensity=kwargs['intensity'])
+                    data_type="sensor_ica", modality=kwargs["modality"], intensity=kwargs['intensity'],
+                    pick_subjects=subject_id)
     elif dataset_name == "ebg_all":
         data = EBG_all(root_path=path, tmin=kwargs["tmin"], tmax=kwargs["tmax"], binary=kwargs["binary"],
                        modality=kwargs["modality"])

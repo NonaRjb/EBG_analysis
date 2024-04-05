@@ -108,6 +108,7 @@ if __name__ == "__main__":
             seed=seed,
             split_seed=split_seed,
             augmentation=False,
+            subject_id=args.subject_id,
             device=device, **constants.data_constants
             )
 
