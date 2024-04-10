@@ -85,6 +85,10 @@ class EBG4(Dataset):
             print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
             self.class_weight = torch.tensor(class_0_count / class_1_count)
         elif binary:
+            # only consider high intensity odors
+            # mask = np.logical_not(np.isin(self.labels.squeeze(), [1, 2, 4]))
+            # self.source_data = self.source_data[mask, ...]
+            # self.labels = self.labels[mask]
             new_labels = [1. if y == 64 else 0. for y in self.labels]
             self.labels = new_labels
             class_0_count = new_labels.count(0.)

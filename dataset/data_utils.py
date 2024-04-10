@@ -149,7 +149,67 @@ def load_source_ebg4(filename):
     return data, labels, time, fs
 
 
-def apply_tfr(in_data: np.ndarray, fs: float, freqs: np.ndarray, n_cycles: float = 3.0, method: str = 'morlet'):
+def crop(tfr, tmin, tmax, fmin, fmax, tvec, freqs) -> np.ndarray:
+
+    """
+    :param tfr: 4-d data array with the shape (n_trials, n_channels, n_freqs, n_samples)
+    :return: cropped array
+    """
+
+    t_min = np.abs(tvec - tmin).argmin()
+    t_max = np.abs(tvec - tmax).argmin()
+
+    f_min = np.abs(freqs - fmin).argmin()
+    f_max = np.abs(freqs - fmax).argmin()
+
+    return tfr[:, :, f_min:f_max, t_min:t_max]
+
+
+def apply_baseline(tfr, bl_lim, tvec, mode):
+
+    if bl_lim[0] is None:
+        baseline_min = 0
+    else:
+        baseline_min = np.abs(tvec - bl_lim[0]).argmin()
+    if bl_lim[1] is None:
+        baseline_max = len(tvec) - 1
+    else:
+        baseline_max = np.abs(tvec - bl_lim[1]).argmin()
+
+    baseline = np.mean(tfr[..., baseline_min:baseline_max], axis=-1, keepdims=True)
+
+    if mode == "mean":
+        def fun(d, m):
+            d -= m
+    elif mode == "ratio":
+        def fun(d, m):
+            d /= m
+    elif mode == "logratio":
+        def fun(d, m):
+            d /= m
+            np.log10(d, out=d)
+    elif mode == "percent":
+        def fun(d, m):
+            d -= m
+            d /= m
+    elif mode == "zscore":
+        def fun(d, m):
+            d -= m
+            d /= np.std(d[..., baseline_min:baseline_max], axis=-1, keepdims=True)
+    elif mode == "zlogratio":
+        def fun(d, m):
+            d /= m
+            np.log10(d, out=d)
+            d /= np.std(d[..., baseline_min:baseline_max], axis=-1, keepdims=True)
+    else:
+        raise NotImplementedError
+
+    fun(tfr, baseline)
+    return tfr
+
+
+def apply_tfr(in_data: np.ndarray, fs: float, freqs: np.ndarray, n_cycles: Union[np.ndarray, int] = 3.0,
+              method: str = 'morlet'):
     if method == 'morlet':
         tfr_power = mne.time_frequency.tfr_array_morlet(
             in_data, sfreq=fs, freqs=freqs, n_cycles=n_cycles,
