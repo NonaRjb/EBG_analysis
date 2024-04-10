@@ -17,16 +17,22 @@ class ModelTrainer:
             optimizer: torch.optim.Optimizer,
             weights: torch.Tensor,
             n_epochs: int,
+            n_classes: int,
             scheduler,
             save_path, device='cuda'
     ):
 
         self.device = device
-
+        self.n_classes = n_classes
         self.model = model.to(device)
-        self.loss_cls = nn.BCEWithLogitsLoss().to(device)
-        self.accuracy = Accuracy(task='binary').to(self.device)
-        self.auroc = AUROC(task="binary")
+        if n_classes == 2:
+            self.loss_cls = nn.BCEWithLogitsLoss().to(self.device)
+            self.accuracy = Accuracy(task='binary').to(self.device)
+            self.auroc = AUROC(task="binary")
+        else:
+            self.loss_cls = nn.CrossEntropyLoss().to(self.device)
+            self.accuracy = Accuracy(task='multiclass', num_classes=n_classes, top_k=1).to(self.device)
+            self.auroc = AUROC(task="multiclass", num_classes=n_classes)
         self.optimizer = optimizer
         self.scheduler = scheduler
 
@@ -62,12 +68,18 @@ class ModelTrainer:
             for x, y in progress_bar:
                 self.optimizer.zero_grad()
                 x = x.to(self.device)
-                y = y.to(self.device)
+                if self.n_classes == 2:
+                    y = y.to(self.device)
+                else:
+                    y = y.to(torch.long).to(self.device)
 
                 with autocast(enabled=self.mixed_precision):
                     preds = self.model(x)
                     preds = preds.squeeze()
-                    loss_classification = self.loss_cls(preds, y)
+                    if self.n_classes == 2:
+                        loss_classification = self.loss_cls(preds, y)
+                    else:
+                        loss_classification = self.loss_cls(preds.float(), y)
 
                 loss_epoch.append(loss_classification.item())
                 y_true.extend(y)
@@ -83,10 +95,14 @@ class ModelTrainer:
             with torch.no_grad():
                 # train_avg_acc = self.accuracy(torch.stack(y_pred), torch.stack(y_true))
                 train_loss = np.mean(loss_epoch)
-                y_pred_bin = torch.stack(y_pred) >= 0.5
+                if self.n_classes == 2:
+                    y_pred_bin = torch.stack(y_pred) >= 0.5
+                    train_balanced_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), y_pred_bin.
+                                                                 detach().cpu())
+                else:
+                    train_balanced_acc = self.accuracy(torch.stack(y_pred).detach().cpu().float(),
+                                                       torch.stack(y_true).detach().cpu())
                 train_auroc = self.auroc(torch.stack(y_pred).detach().cpu().float(), torch.stack(y_true).detach().cpu())
-                train_balanced_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), y_pred_bin.
-                                                             detach().cpu())
 
             if epoch % self.log_freq == 0 or epoch == self.epochs - 1:
                 val_loss, val_balanaced_acc, val_auroc, y_true_val, y_pred_val = self.evaluate(self.model, val_data_loader)
@@ -169,21 +185,32 @@ class ModelTrainer:
         with torch.no_grad():
             for x, y in progress_bar:
                 x = x.to(self.device)
-                y = y.to(self.device)
+                if self.n_classes == 2:
+                    y = y.to(self.device)
+                else:
+                    y = y.to(torch.long).to(self.device)
 
                 with autocast(enabled=self.mixed_precision):
                     preds = model(x)
                     preds = preds.squeeze()
-                    loss_classification = self.loss_cls(preds, y)
+                    if self.n_classes == 2:
+                        loss_classification = self.loss_cls(preds, y)
+                    else:
+                        loss_classification = self.loss_cls(preds.float(), y)
 
                 loss_epoch.append(loss_classification.item())
                 y_true.extend(y)
                 y_pred.extend(torch.sigmoid(preds))
 
             mean_loss_epoch = np.mean(loss_epoch)
-            y_pred_bin = torch.stack(y_pred) >= 0.5
+            if self.n_classes == 2:
+                y_pred_bin = torch.stack(y_pred) >= 0.5
+                avg_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), y_pred_bin.
+                                                             detach().cpu())
+            else:
+                avg_acc = self.accuracy(torch.stack(y_pred).detach().cpu().float(),
+                                                   torch.stack(y_true).detach().cpu())
             # avg_acc = self.accuracy(torch.stack(y_pred), torch.stack(y_true))
             auroc = self.auroc(torch.stack(y_pred).detach().cpu().float(), torch.stack(y_true).detach().cpu())
-            avg_acc = balanced_accuracy_score(torch.stack(y_true).detach().cpu(), y_pred_bin.detach().cpu())
 
         return mean_loss_epoch, avg_acc, auroc, y_true, y_pred

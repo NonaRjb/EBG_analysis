@@ -17,7 +17,7 @@ os.environ["WANDB_API_KEY"] = "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 os.environ['WANDB_START_METHOD'] = 'thread'
 cluster_data_path = '/local_storage/datasets/nonar/ebg/'
 cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-local_data_path = "/Users/nonarajabi/Desktop/KTH/Smell/Novel_Bulb_measure/data/"
+local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
 
 
@@ -77,11 +77,8 @@ if __name__ == "__main__":
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print("device = ", device)
 
-        if dataset_name == 'dataset3_tfr':
-            local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
-        elif 'ebg4' in dataset_name:
-            local_data_path = '/Volumes/T5 EVO/Odor_Intensity/'
-            cluster_data_path = os.path.join(cluster_data_path, 'Odor_Intensity')
+        # if dataset_name == 'ebg3_tfr':
+        #     local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
 
         paths = {
             "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
@@ -95,7 +92,7 @@ if __name__ == "__main__":
         while os.path.exists(os.path.join(paths["save_path"], directory_name + str(cnt))):
             cnt += 1
         paths["save_path"] = os.path.join(paths["save_path"], directory_name + str(cnt))
-        os.makedirs(paths["save_path"])
+        os.makedirs(paths["save_path"], exist_ok=True)
         print(f"Directory '{directory_name}' created.")
         create_readme(wandb.config, path=paths['save_path'])
 
@@ -110,12 +107,14 @@ if __name__ == "__main__":
             batch_size=batch_size,
             seed=seed,
             split_seed=split_seed,
-            augmentation=True,
+            augmentation=False,
+            subject_id=args.subject_id,
             device=device, **constants.data_constants
             )
 
         # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
         print("EEG sequence length = ", n_time_samples)
+        print(f"Training on {constants.data_constants['n_classes']} classes")
 
         if args.dropout is not None:
             constants.model_constants['lstm']['dropout'] = args.dropout
@@ -185,7 +184,8 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError
         
-        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs, save_path=paths['save_path'],
+        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs,
+                               n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
                                weights=None, device=device, scheduler=scheduler)
         best_model = trainer.train(train_loader, val_loader)
         metrics['loss'].append(best_model['loss'])
