@@ -2,5 +2,4 @@ wandb/
 logs/
 __pycache__/
 .idea/
-scripts/
 *.txt

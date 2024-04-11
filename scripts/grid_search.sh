@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --mem  50GB
+#SBATCH --mem  20GB
 #SBATCH --gres gpu:1
 #SBATCH --cpus-per-task 4
 #SBATCH --constrain "eowyn|galadriel|belegost|khazadum"
@@ -7,7 +7,10 @@
 #SBATCH --mail-user nonar@kth.se
 #SBATCH --output /Midgard/home/%u/EBG_analysis/logs/cluster_logs/%A_%a_slurm.out
 #SBATCH --error  /Midgard/home/%u/EBG_analysis/logs/cluster_logs/%A_%a_slurm.err
-#SBATCH --array=0-0%1
+#SBATCH --array=1-1%1
+
+c_array=(0.01 0.1 1 10 100)
+C=${c_array[$((SLURM_ARRAY_TASK_ID-1))]}
 
 # Check job environment
 echo "JOB:  ${SLURM_JOB_ID}"
@@ -24,19 +27,5 @@ else
   conda activate eegnet_pytorch
 fi
 
-
-
-sweep_id='ju0cw9qa'
-echo 'sweep_id:' $sweep_id
-
-project_name='EBG_Olfaction'
-echo 'project_name:' $project_name
-
-echo 'job array task:' "${SLURM_ARRAY_TASK_ID}"
-
-entity_name='nona-phd'
-
-export WANDB_API_KEY=d5a82a7201d64dd1120fa3be37072e9e06e382a1
-
-wandb login ""
-wandb agent $sweep_id --project $project_name --entity $entity_name
+python train_logistic_reg.py --subject_id 1 --data ebg4_sensor --data_type sensor_ica --modality ebg --tmin 0.06 \
+--tmax 0.1 --fmin 45 --fmax 80 -c "$C" --seed 42 --save True
