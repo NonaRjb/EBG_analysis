@@ -13,11 +13,10 @@ import os
 
 from dataset.data_utils import load_ebg4, apply_tfr, crop, apply_baseline
 
-
 cluster_data_path = '/local_storage/datasets/nonar/ebg/'
 cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
-local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
+local_save_path = "/Volumes/T5 EVO/Smell/"
 
 
 def confusion_matrix_scorer(clf_, X_, y):
@@ -101,27 +100,37 @@ def load_eeg_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_li
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', type=str, default='ebg4_source')
+    parser.add_argument('--data', type=str, default='ebg4_sensor')
     parser.add_argument('--subject_id', type=int, default=0)
-    parser.add_argument('--tmin', type=float, default=-0.1)
-    parser.add_argument('--tmax', type=float, default=1.0)
+    parser.add_argument('--tmin', type=float, default=-0.5)
+    parser.add_argument('--tmax', type=float, default=0.25)
     parser.add_argument('--fmin', type=float, default=20)
     parser.add_argument('--fmax', type=float, default=100)
+    parser.add_argument('-c', type=float, default=1.0)
     parser.add_argument('--data_type', type=str, default="sensor_ica")
     parser.add_argument('--modality', type=str, default="ebg")
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--save', type=bool, default=False)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
+
+    loc = "local"
+    if loc == "local":
+        data_path = local_data_path
+        save_path = local_save_path
+    else:
+        data_path = cluster_data_path
+        save_path = cluster_save_path
+
     args = parse_args()
 
     dataset_name = args.data
-    fmin = args.fmin
-    fmax = args.fmax
     seed = args.seed
+    c = args.c
 
-    data_path = os.path.join(local_data_path, "ebg4")
+    data_path = os.path.join(data_path, "ebg4")
 
     if args.subject_id == 0:
         subject_ids = [i for i in range(1, 26) if i != 10]
@@ -133,19 +142,19 @@ if __name__ == "__main__":
                     subject_id=subj,
                     data_type=args.data_type,
                     modality=args.modality,
-                    tmin=args.tmin,
-                    tmax=args.tmax,
+                    tmin=None,
+                    tmax=None,
                     bl_lim=None
                 )
 
-            freqs = np.arange(fmin, fmax)
+            freqs = np.arange(20, 100)
             tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
 
             # apply baseline correction
             tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
 
             # crop the time interval of interest
-            tfr = crop(tfr, tmin=0.06, tmax=0.1, fmin=45, fmax=70, tvec=t, freqs=freqs)
+            tfr = crop(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
             # take the mean over channels
             tfr_mean = tfr.mean(axis=1).squeeze()
             n_trials = tfr_mean.shape[0]
@@ -155,9 +164,10 @@ if __name__ == "__main__":
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             scores[str(subj)] = []
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-
-                clf = LogisticRegression(C=.6, penalty='elasticnet', solver='saga', l1_ratio=0.5, max_iter=2000,
-                                         random_state=seed)
+                clf = make_pipeline(StandardScaler(),
+                                    LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                                                       max_iter=2000,
+                                                       random_state=seed))
                 # clf = make_pipeline(StandardScaler(),
                 #                     SVC(C=.6,
                 #                         kernel='rbf',
@@ -189,7 +199,7 @@ if __name__ == "__main__":
         plt.xlabel('Subject ID')
         plt.ylabel('AUC Score')
         plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.savefig(os.path.join(local_data_path, "plots", "ebg4_auc_logistic_reg", f"auc_box_plots_svm.png"))
+        plt.savefig(os.path.join(save_path, "plots", "ebg4_auc_logistic_reg", f"auc_box_plots_lr.png"))
         plt.show()
     else:
 
@@ -199,26 +209,29 @@ if __name__ == "__main__":
                 subject_id=args.subject_id,
                 data_type=args.data_type,
                 modality=args.modality,
-                tmin=args.tmin,
-                tmax=args.tmax,
+                tmin=None,
+                tmax=None,
                 bl_lim=None
             )
 
-        freqs = np.arange(fmin, fmax)
+        freqs = np.arange(20, 100)
         tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
 
         # apply baseline correction
         tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
 
         # crop the time interval of interest
-        tfr = crop(tfr, tmin=0.06, tmax=0.1, fmin=45, fmax=70, tvec=t, freqs=freqs)
+        tfr = crop(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
         # take the mean over channels
         tfr_mean = tfr.mean(axis=1).squeeze()
         n_trials = tfr_mean.shape[0]
         X = tfr_mean.reshape(n_trials, -1)
         y = np.asarray(labels_array)
 
-        clf = LogisticRegression(penalty='elasticnet', solver='saga', l1_ratio=0.5, max_iter=2000, random_state=seed)
+        clf = make_pipeline(# StandardScaler(),
+                            LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                                               max_iter=2000,
+                                               random_state=seed))
 
         skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
 
@@ -240,10 +253,14 @@ if __name__ == "__main__":
             auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
             scores.append(auc_score)
 
-        plt.hist(scores, bins=10)
+        if args.save is True:
+            os.makedirs(os.path.join(save_path, "grid_search_c", str(args.subject_id)), exist_ok=True)
+            np.save(
+                os.path.join(save_path, "grid_search_c", str(args.subject_id), f"s{args.subject_id}_c{args.c}.npy"),
+                np.asarray(scores)
+            )
+        plt.boxplot(scores, labels=str(args.subject_id))
+        plt.axhline(y=0.5, color='r', linestyle='--')
         plt.title(f"AUC Scores Subject {args.subject_id}")
-        plt.savefig(os.path.join(local_data_path, "plots", "ebg4_auc_logistic_reg", f"subj_{args.subject_id}.png"))
+        plt.savefig(os.path.join(save_path, "plots", "ebg4_auc_logistic_reg", f"subj_{args.subject_id}.png"))
         plt.show()
-
-
-

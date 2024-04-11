@@ -156,11 +156,23 @@ def crop(tfr, tmin, tmax, fmin, fmax, tvec, freqs) -> np.ndarray:
     :return: cropped array
     """
 
-    t_min = np.abs(tvec - tmin).argmin()
-    t_max = np.abs(tvec - tmax).argmin()
+    if tmin is None:
+        t_min = 0
+    else:
+        t_min = np.abs(tvec - tmin).argmin()
+    if tmax is None:
+        t_max = len(tvec)
+    else:
+        t_max = np.abs(tvec - tmax).argmin()
 
-    f_min = np.abs(freqs - fmin).argmin()
-    f_max = np.abs(freqs - fmax).argmin()
+    if fmin is None:
+        f_min = 0
+    else:
+        f_min = np.abs(freqs - fmin).argmin()
+    if fmax is None:
+        f_max = len(freqs)
+    else:
+        f_max = np.abs(freqs - fmax).argmin()
 
     return tfr[:, :, f_min:f_max, t_min:t_max]
 
