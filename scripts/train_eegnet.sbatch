@@ -38,5 +38,5 @@ entity_name='nona-phd'
 
 export WANDB_API_KEY=d5a82a7201d64dd1120fa3be37072e9e06e382a1
 
-wandb login ""
+wandb login "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 wandb agent $sweep_id --project $project_name --entity $entity_name
