@@ -13,8 +13,8 @@ import os
 
 from dataset.data_utils import load_ebg4, apply_tfr, crop, apply_baseline
 
-cluster_data_path = '/local_storage/datasets/nonar/ebg/'
-cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
+cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Volumes/T5 EVO/Smell/"
 
@@ -110,13 +110,13 @@ def parse_args():
     parser.add_argument('--data_type', type=str, default="sensor_ica")
     parser.add_argument('--modality', type=str, default="ebg")
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--save', type=bool, default=False)
+    parser.add_argument('--save', action='store_true')
     return parser.parse_args()
 
 
 if __name__ == "__main__":
 
-    loc = "local"
+    loc = "remote"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -164,7 +164,7 @@ if __name__ == "__main__":
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             scores[str(subj)] = []
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-                clf = make_pipeline(StandardScaler(),
+                clf = make_pipeline(# StandardScaler(),
                                     LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                        max_iter=2000,
                                                        random_state=seed))
@@ -254,13 +254,15 @@ if __name__ == "__main__":
             scores.append(auc_score)
 
         if args.save is True:
-            os.makedirs(os.path.join(save_path, "grid_search_c", str(args.subject_id)), exist_ok=True)
+            print("Saving the AUC Scores")
+            os.makedirs(os.path.join(save_path, "plots", "grid_search_c", str(args.subject_id)), exist_ok=True)
             np.save(
-                os.path.join(save_path, "grid_search_c", str(args.subject_id), f"s{args.subject_id}_c{args.c}.npy"),
+                os.path.join(save_path, "plots", "grid_search_c", str(args.subject_id), f"s{args.subject_id}_c{args.c}.npy"),
                 np.asarray(scores)
             )
-        plt.boxplot(scores, labels=str(args.subject_id))
+        plt.boxplot(scores, labels=[str(args.subject_id)])
         plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.title(f"AUC Scores Subject {args.subject_id}")
-        plt.savefig(os.path.join(save_path, "plots", "ebg4_auc_logistic_reg", f"subj_{args.subject_id}.png"))
-        plt.show()
+        plt.title(f"AUC Scores Subject {args.subject_id}, C = {args.c}")
+        os.makedirs(os.path.join(save_path, "plots", "ebg4_auc_box_plot", str(args.subject_id)), exist_ok=True)
+        plt.savefig(os.path.join(save_path, "plots", "ebg4_auc_box_plot", str(args.subject_id), f"s{args.subject_id}_c{args.c}.png"))
+        # plt.show()
