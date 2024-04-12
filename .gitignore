@@ -1,5 +1,6 @@
 wandb/
 logs/
 __pycache__/
+scripts/
 .idea/
 *.txt
