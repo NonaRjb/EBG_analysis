@@ -5,6 +5,7 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import cross_validate
+from mne.decoding import CSP
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -161,10 +162,14 @@ if __name__ == "__main__":
             X = tfr_mean.reshape(n_trials, -1)
             y = np.asarray(labels_array)
 
+            csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
+            
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             scores[str(subj)] = []
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
+
                 clf = make_pipeline(# StandardScaler(),
+                                    csp,
                                     LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                        max_iter=2000,
                                                        random_state=seed))
