@@ -1,18 +1,19 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import cross_validate
-from mne.decoding import CSP
+from mne.decoding import CSP, UnsupervisedSpatialFilter
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import math
 import os
 
-from dataset.data_utils import load_ebg4, apply_tfr, crop, apply_baseline
+from dataset.data_utils import load_ebg4, apply_tfr, crop_tfr, crop_temporal, apply_baseline
 
 cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
@@ -117,7 +118,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "remote"
+    loc = "local"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -155,14 +156,20 @@ if __name__ == "__main__":
             tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
 
             # crop the time interval of interest
-            tfr = crop(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
+            tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
             # take the mean over channels
             tfr_mean = tfr.mean(axis=1).squeeze()
             n_trials = tfr_mean.shape[0]
-            X = tfr_mean.reshape(n_trials, -1)
+
+            data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
+
+            # X = tfr_mean
+            # X = tfr_mean.reshape(n_trials, -1)
+            X = data_array.astype(float)
+
             y = np.asarray(labels_array)
 
-            csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
+            csp = CSP(n_components=4, reg=1e-05, log=None, transform_into='average_power', norm_trace=False)
             
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             scores[str(subj)] = []
@@ -173,7 +180,8 @@ if __name__ == "__main__":
                                     LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                        max_iter=2000,
                                                        random_state=seed))
-                # clf = make_pipeline(StandardScaler(),
+                # clf = make_pipeline(csp,
+                #                     StandardScaler(),
                 #                     SVC(C=.6,
                 #                         kernel='rbf',
                 #                         degree=3,
@@ -200,11 +208,13 @@ if __name__ == "__main__":
         score_keys = scores.keys()
         plt.figure(figsize=(40, 6))
         plt.boxplot(score_values, labels=score_keys)
-        plt.title('Boxplot of AUC Scores for Each Subject')
+        plt.title('Boxplot of AUC Scores for Each Subject ')
         plt.xlabel('Subject ID')
         plt.ylabel('AUC Score')
         plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.savefig(os.path.join(save_path, "plots", "ebg4_auc_logistic_reg", f"auc_box_plots_lr.png"))
+        plt.savefig(
+            os.path.join(save_path, "plots", "ebg4_auc_logistic_reg",
+                         f"auc_box_log_reg_csp_both_{args.tmin}_{args.tmax}_{args.fmin}_{args.fmax}.png"))
         plt.show()
     else:
 
@@ -226,14 +236,17 @@ if __name__ == "__main__":
         tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
 
         # crop the time interval of interest
-        tfr = crop(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
+        tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
         # take the mean over channels
         tfr_mean = tfr.mean(axis=1).squeeze()
         n_trials = tfr_mean.shape[0]
-        X = tfr_mean.reshape(n_trials, -1)
+        # X = tfr_mean.reshape(n_trials, -1)
+        X = data_array
         y = np.asarray(labels_array)
 
+        csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
         clf = make_pipeline(# StandardScaler(),
+                            csp,
                             LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                max_iter=2000,
                                                random_state=seed))
