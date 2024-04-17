@@ -1,4 +1,5 @@
 from sklearn.linear_model import LogisticRegression
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -19,6 +20,33 @@ cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Volumes/T5 EVO/Smell/"
+
+c_dict = {
+    '1': 1.0,
+    '2': 1.0,
+    '3': 64.0,
+    '4': 64.0,
+    '5': 1.0,
+    '6': 32.0,
+    '7': 1.0,
+    '8': 1.0,
+    '9': 1.0,
+    '11': 4.0,
+    '12': 32.0,
+    '13': 32.0,
+    '14': 0.5,
+    '15': 1.0,
+    '16': 64.0,
+    '17': 16.0,
+    '18': 1.0,
+    '19': 0.5,
+    '20': 0.5,
+    '21': 4.0,
+    '22': 0.5,
+    '23': 0.5,
+    '24': 16.0,
+    '25': 0.5,
+}
 
 
 def confusion_matrix_scorer(clf_, X_, y):
@@ -135,7 +163,7 @@ if __name__ == "__main__":
     data_path = os.path.join(data_path, "ebg4")
 
     if args.subject_id == 0:
-        subject_ids = [i for i in range(1, 26) if i != 10]
+        subject_ids = [i for i in range(1, 38) if i != 10]
         scores = {}
         for subj in subject_ids:
             data_array, labels_array, t, sfreq = \
@@ -164,8 +192,8 @@ if __name__ == "__main__":
             data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
 
             # X = tfr_mean
-            # X = tfr_mean.reshape(n_trials, -1)
-            X = data_array.astype(float)
+            X = tfr_mean.reshape(n_trials, -1)
+            # X = data_array.astype(float)
 
             y = np.asarray(labels_array)
 
@@ -176,10 +204,13 @@ if __name__ == "__main__":
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
 
                 clf = make_pipeline(# StandardScaler(),
-                                    csp,
-                                    LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                                    # csp,
+                                    LogisticRegression(C=c_dict[str(subj)], penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                        max_iter=2000,
                                                        random_state=seed))
+                # clf = make_pipeline(  # StandardScaler(),
+                #     csp,
+                #     LinearDiscriminantAnalysis())
                 # clf = make_pipeline(csp,
                 #                     StandardScaler(),
                 #                     SVC(C=.6,
@@ -191,6 +222,8 @@ if __name__ == "__main__":
 
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
+
+                csp.fit(X_train, y_train)
 
                 # Count samples from each class in train and test sets
                 unique_train, counts_train = np.unique(y_train, return_counts=True)
@@ -214,7 +247,14 @@ if __name__ == "__main__":
         plt.axhline(y=0.5, color='r', linestyle='--')
         plt.savefig(
             os.path.join(save_path, "plots", "ebg4_auc_logistic_reg",
-                         f"auc_box_log_reg_csp_both_{args.tmin}_{args.tmax}_{args.fmin}_{args.fmax}.png"))
+                         f"auc_box_plot_log_reg_{args.tmin}_{args.tmax}_{args.fmin}_{args.fmax}.png"))
+        if args.save is True:
+            print("Saving the AUC Scores")
+            np.save(
+                os.path.join(save_path, "plots", "ebg4_auc_logistic_reg", str(args.subject_id),
+                             f"auc_scores_all_subjects.npy"),
+                np.asarray(scores)
+            )
         plt.show()
     else:
 

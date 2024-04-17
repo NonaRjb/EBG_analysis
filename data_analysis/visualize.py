@@ -1,3 +1,5 @@
+import pickle
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -41,14 +43,59 @@ def compare_logreg_c(root_path, save_path):
     return
 
 
+def load_dnn_subj_results(root_path, subject_id):
+    filenames = os.listdir(os.path.join(root_path, str(subject_id)))
+    aucs = []
+    epochs = []
+    for fn in filenames:
+        with open(os.path.join(root_path, str(subject_id), fn), 'rb') as f:
+            res = pickle.load(f)
+            aucs.append(res['auroc'][0].detach().numpy())
+            epochs.append(res['epoch'][0])
+    return aucs, epochs
 
 
+def plot_dnn_res(root_path, save_path):
+    subjects = [i for i in range(1, 26) if i != 10]
+    aucs = {}
+    epochs = {}
+    for subject in subjects:
+        aucs[str(subject)], epochs[str(subject)] = load_dnn_subj_results(root_path, subject)
+
+    auc_values = aucs.values()
+    auc_keys = aucs.keys()
+    plt.figure(figsize=(40, 6))
+    plt.boxplot(auc_values, labels=auc_keys)
+    plt.grid(axis='y', color='0.97')
+    plt.title('Boxplot of AUC Scores for Each Subject')
+    plt.xlabel('Subject ID')
+    plt.ylabel('AUC Score')
+    plt.axhline(y=0.5, color='r', linestyle='--')
+    plt.savefig(
+        os.path.join(save_path, "plots", "ebg4_dnn", f"auc_box_plot_eegnet1d.png"))
+
+    epoch_vals = epochs.values()
+    epoch_keys = epochs.keys()
+    plt.figure(figsize=(40, 6))
+    plt.boxplot(epoch_vals, labels=epoch_keys)
+    plt.grid(axis='y', color='0.97')
+    plt.title('Boxplot of Epochs with Best AUC Score for Each Subject')
+    plt.xlabel('Subject ID')
+    plt.ylabel('Epoch')
+    plt.savefig(
+        os.path.join(save_path, "plots", "ebg4_dnn", f"epoch_box_plot_eegnet1d.png"))
+
+    plt.show()
 
 
 if __name__ == "__main__":
-    task = "compare_logreg_c"
+    task = "plot_dnn_res"
 
     if task == "compare_logreg_c":
         path_to_data = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/grid_search_c"
         path_to_save = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/ebg4_auc_box_plot"
         compare_logreg_c(path_to_data, path_to_save)
+    elif task == "plot_dnn_res":
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_ebg"
+        path_to_save = "/Volumes/T5 EVO/Smell"
+        plot_dnn_res(path_to_data, path_to_save)
