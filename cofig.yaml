@@ -36,12 +36,6 @@ parameters:
     value: tfr_morlet
   eeg:
     value: eegnet1d
-  dropout:
-    value: 0.25
-  hidden_size:
-    value: 64
-  num_layers:
-    value: 1
   batch_size:
     value: 32
   lr:
