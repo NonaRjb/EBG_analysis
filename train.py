@@ -85,16 +85,20 @@ if __name__ == "__main__":
             "save_path": cluster_save_path if device == 'cuda' else local_save_path
         }
 
-        directory_name = f"{dataset_name}_{eeg_enc_name}"
+        directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
+        os.makedirs(os.path.join(paths['save_path'], directory_name), exist_ok=True)
+        os.makedirs(os.path.join(paths['save_path'], directory_name, str(args.subject_id)), exist_ok=True)
+        paths['save_path'] = os.path.join(paths['save_path'], directory_name, str(args.subject_id))
         current_datetime = datetime.now()
-        directory_name += current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
-        cnt = 0
-        while os.path.exists(os.path.join(paths["save_path"], directory_name + str(cnt))):
-            cnt += 1
-        paths["save_path"] = os.path.join(paths["save_path"], directory_name + str(cnt))
-        os.makedirs(paths["save_path"], exist_ok=True)
+        print(current_datetime.strftime("%Y-%m-%d_%H-%M-%S"))
+        # directory_name += current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
+        # cnt = 0
+        # while os.path.exists(os.path.join(paths["save_path"], directory_name + str(cnt))):
+        #     cnt += 1
+        # paths["save_path"] = os.path.join(paths["save_path"], directory_name + str(cnt))
+        # os.makedirs(paths["save_path"], exist_ok=True)
         print(f"Directory '{directory_name}' created.")
-        create_readme(wandb.config, path=paths['save_path'])
+        # create_readme(wandb.config, path=paths['save_path'])
 
         constants.data_constants['tmin'] = args.tmin
         constants.data_constants['tmax'] = args.tmax
@@ -134,7 +138,7 @@ if __name__ == "__main__":
         # sss = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=seed)
         train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
 
-        metrics = {'loss': [], 'acc': [], 'auroc': []}
+        metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': []}
         # g = torch.Generator().manual_seed(seed)
         # for fold, (train_ids, test_ids) in enumerate(sss.split(data, data.labels)):
 
@@ -191,9 +195,13 @@ if __name__ == "__main__":
         metrics['loss'].append(best_model['loss'])
         metrics['acc'].append(best_model['acc'])
         metrics['auroc'].append(best_model['auroc'])
+        metrics['epoch'].append(best_model['epoch'])
             # model.load_state_dict(best_model['model_state_dict'])
-        print(f"Average Balanced Accuracy: {np.mean(np.array(metrics['acc']))}")
-        with open(os.path.join(paths['save_path'], f'{eeg_enc_name}_{batch_size}_{lr}_{epochs}_{optim_name}.pkl'),
+        print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        with open(os.path.join(paths['save_path'], f'{args.split_seed}.pkl'),
                   'wb') as f:
             pickle.dump(metrics, f)
+        # with open(os.path.join(paths['save_path'], f'{eeg_enc_name}_{batch_size}_{lr}_{epochs}_{optim_name}.pkl'),
+        #           'wb') as f:
+        #     pickle.dump(metrics, f)
         # loss_test, acc_test, auroc_test = trainer.evaluate(model, test_loader)
