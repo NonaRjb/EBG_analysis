@@ -45,7 +45,7 @@ c_dict = {
     '22': 0.5,
     '23': 0.5,
     '24': 16.0,
-    '25': 0.5,
+    '25': 0.5
 }
 
 
@@ -280,14 +280,14 @@ if __name__ == "__main__":
         # take the mean over channels
         tfr_mean = tfr.mean(axis=1).squeeze()
         n_trials = tfr_mean.shape[0]
-        # X = tfr_mean.reshape(n_trials, -1)
-        X = data_array
+        X = tfr_mean.reshape(n_trials, -1)
+        # X = data_array
         y = np.asarray(labels_array)
 
         csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
         clf = make_pipeline(# StandardScaler(),
-                            csp,
-                            LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                            # csp,
+                            LogisticRegression(C=c_dict[str(args.subject_id)], penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                max_iter=2000,
                                                random_state=seed))
 
