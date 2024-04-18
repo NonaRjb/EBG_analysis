@@ -164,7 +164,7 @@ def crop_temporal(data, tmin, tmax, tvec):
     return data[..., t_min:t_max]
 
 
-def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None) -> np.ndarray:
+def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None, fs=512) -> np.ndarray:
 
     """
     :param tfr: 4-d data array with the shape (n_trials, n_channels, n_freqs, n_samples)
@@ -181,12 +181,14 @@ def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None) -> np.ndarray:
             t_max = len(tvec)
         else:
             t_max = np.abs(tvec - tmax).argmin()
+    else:
+        if tmin is None:
+            t_max = int(w * fs)
         else:
-            if tmin is None:
-                t_max = int(w * self.fs)
-            else:
-                tmax = tmin + w
-                t_max = np.abs(tvec - tmax).argmin()
+            tmax = tmin + w
+            t_max = np.abs(tvec - tmax).argmin()
+    
+    print(f"Number of Time Samples: {t_max-t_min}")
 
     if fmin is None:
         f_min = 0

@@ -134,6 +134,7 @@ def parse_args():
     parser.add_argument('--subject_id', type=int, default=0)
     parser.add_argument('--tmin', type=float, default=-0.5)
     parser.add_argument('--tmax', type=float, default=0.25)
+    parser.add_argument('-w', type=float, default=None)
     parser.add_argument('--fmin', type=float, default=20)
     parser.add_argument('--fmax', type=float, default=100)
     parser.add_argument('-c', type=float, default=1.0)
@@ -146,7 +147,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "local"
+    loc = "remote"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -154,11 +155,13 @@ if __name__ == "__main__":
         data_path = cluster_data_path
         save_path = cluster_save_path
 
+    save_path = os.path.join(save_path, "plots", "grid_search_tmin")
     args = parse_args()
 
     dataset_name = args.data
     seed = args.seed
     c = args.c
+    w = args.w
 
     data_path = os.path.join(data_path, "ebg4")
 
@@ -246,12 +249,12 @@ if __name__ == "__main__":
         plt.ylabel('AUC Score')
         plt.axhline(y=0.5, color='r', linestyle='--')
         plt.savefig(
-            os.path.join(save_path, "plots", "ebg4_auc_logistic_reg",
+            os.path.join(save_path,
                          f"auc_box_plot_log_reg_{args.tmin}_{args.tmax}_{args.fmin}_{args.fmax}.png"))
         if args.save is True:
             print("Saving the AUC Scores")
             np.save(
-                os.path.join(save_path, "plots", "ebg4_auc_logistic_reg", str(args.subject_id),
+                os.path.join(save_path, str(args.subject_id),
                              f"auc_scores_all_subjects.npy"),
                 np.asarray(scores)
             )
@@ -276,7 +279,7 @@ if __name__ == "__main__":
         tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
 
         # crop the time interval of interest
-        tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
+        tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
         # take the mean over channels
         tfr_mean = tfr.mean(axis=1).squeeze()
         n_trials = tfr_mean.shape[0]
@@ -313,14 +316,15 @@ if __name__ == "__main__":
 
         if args.save is True:
             print("Saving the AUC Scores")
-            os.makedirs(os.path.join(save_path, "plots", "grid_search_c", str(args.subject_id)), exist_ok=True)
+            os.makedirs(os.path.join(save_path, str(args.subject_id)), exist_ok=True)
             np.save(
-                os.path.join(save_path, "plots", "grid_search_c", str(args.subject_id), f"s{args.subject_id}_c{args.c}.npy"),
+                os.path.join(save_path, str(args.subject_id), f"{args.tmin}.npy"),
                 np.asarray(scores)
             )
         plt.boxplot(scores, labels=[str(args.subject_id)])
         plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.title(f"AUC Scores Subject {args.subject_id}, C = {args.c}")
-        os.makedirs(os.path.join(save_path, "plots", "ebg4_auc_box_plot", str(args.subject_id)), exist_ok=True)
-        plt.savefig(os.path.join(save_path, "plots", "ebg4_auc_box_plot", str(args.subject_id), f"s{args.subject_id}_c{args.c}.png"))
+        plt.title(f"AUC Scores Subject {args.subject_id}, tmin = {args.tmin}")
+        os.makedirs(os.path.join(save_path, "plots"), exist_ok=True)
+        os.makedirs(os.path.join(save_path, "plots", str(args.subject_id)), exist_ok=True)
+        plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"s{args.subject_id}_t{args.tmin}.png"))
         # plt.show()
