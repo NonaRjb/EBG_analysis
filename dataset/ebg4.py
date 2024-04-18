@@ -11,6 +11,7 @@ class EBG4(Dataset):
             self, root_path: str,
             tmin: float = None,
             tmax: float = None,
+            w: float = None,
             binary: bool = True,
             data_type: str = 'source',
             modality: str = 'both',
@@ -20,7 +21,10 @@ class EBG4(Dataset):
 
         self.root_path = root_path
         if pick_subjects == 0:
-            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+            if data_type != 'source':
+                subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]    
+            else:
+                subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
             print("***** Training On All Available Subject *****")
         else:
             subjects = [pick_subjects]
@@ -66,10 +70,18 @@ class EBG4(Dataset):
         else:
             self.t_min = np.abs(self.time_vec - tmin).argmin()
 
-        if tmax is None:
-            self.t_max = len(self.time_vec)
+        if w is None:
+            if tmax is None:
+                self.t_max = len(self.time_vec)
+            else:
+                self.t_max = np.abs(self.time_vec - tmax).argmin()
         else:
-            self.t_max = np.abs(self.time_vec - tmax).argmin()
+            if tmin is None:
+                self.t_max = int(w * self.fs)
+            else:
+                tmax = tmin + w
+                self.t_max = np.abs(self.time_vec - tmax).argmin()
+        print(f"first time sample: {self.t_min}, last time sample: {self.t_max}")
 
         self.baseline_min = np.abs(self.time_vec - self.baseline_min).argmin()
         self.baseline_max = np.abs(self.time_vec - self.baseline_max).argmin()

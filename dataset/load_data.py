@@ -33,16 +33,16 @@ def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: i
                        baseline_type=kwargs['baseline_type'])
     elif dataset_name == 'ebg4_source':
         path = os.path.join(path, "ebg4")
-        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
                     data_type="source", intensity=kwargs['intensity'], pick_subjects=subject_id)
     elif dataset_name == 'ebg4_sensor':
         path = os.path.join(path, "ebg4")
-        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
                     data_type="sensor", modality=kwargs["modality"], intensity=kwargs['intensity'],
                     pick_subjects=subject_id)
     elif dataset_name == 'ebg4_sensor_ica':
         path = os.path.join(path, "ebg4")
-        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], binary=kwargs['binary'],
+        data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
                     data_type="sensor_ica", modality=kwargs["modality"], intensity=kwargs['intensity'],
                     pick_subjects=subject_id)
     elif dataset_name == "ebg_all":

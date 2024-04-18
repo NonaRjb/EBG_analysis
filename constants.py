@@ -3,6 +3,7 @@ import numpy as np
 data_constants = {
     'tmin': -0.1,
     'tmax': 0.25,
+    'w': 0.5,
     'fmin': None,
     'fmax': None,
     'binary': True,
