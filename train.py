@@ -58,16 +58,21 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     with wandb.init(project="EBG_Olfaction", config=args):
-    # with wandb.init():
+        # with wandb.init():
         args = wandb.config
         seed = args.seed
         split_seed = args.split_seed
         seed_everything(seed)
         dataset_name = args.data
-        if args.subject_id != -1: 
+        if args.subject_id != -1:
             subject_ids = [args.subject_id]
         else:
-            subject_ids = [id for id in range(1, 26) if id != 10] 
+            if 'ebg4' in dataset_name:
+                subject_ids = [i for i in range(1, 26) if i != 10]
+            elif 'ebg1' in dataset_name:
+                subject_ids = [i for i in range(1, 31) if i != 4]
+            else:
+                raise NotImplementedError
         eeg_enc_name = args.eeg
         batch_size = args.batch_size
         lr = args.lr
@@ -96,7 +101,8 @@ if __name__ == "__main__":
                 "save_path": cluster_save_path if device == 'cuda' else local_save_path
             }
             os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject_id)), exist_ok=True)
-            os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject_id), str(args.tmin)), exist_ok=True)
+            os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject_id), str(args.tmin)),
+                        exist_ok=True)
             paths['save_path'] = os.path.join(paths['save_path'], directory_name, str(subject_id), str(args.tmin))
             current_datetime = datetime.now()
             print(current_datetime.strftime("%Y-%m-%d_%H-%M-%S"))
@@ -124,20 +130,20 @@ if __name__ == "__main__":
                 augmentation=False,
                 subject_id=subject_id,
                 device=device, **constants.data_constants
-                )
+            )
 
             # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
             print("EEG sequence length = ", n_time_samples)
             print(f"Training on {constants.data_constants['n_classes']} classes")
 
-
             constants.model_constants['eegnet']['n_samples'] = n_time_samples
             constants.model_constants['eegnet1d']['n_samples'] = n_time_samples
             constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples
             constants.model_constants['resnet1d']['n_samples'] = n_time_samples
-            
+
             # sss = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=seed)
-            train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
+            train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders[
+                'test_loader']
 
             metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': []}
             # g = torch.Generator().manual_seed(seed)
@@ -149,14 +155,14 @@ if __name__ == "__main__":
             #     train_sub_sampler = torch.utils.data.SubsetRandomSampler(train_ids, generator=g)
             #     test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_ids, generator=g)
 
-                # Define data loaders for training and testing data in this fold
-        
-                # train_loader = torch.utils.data.DataLoader(
-                #     data,
-                #     batch_size=batch_size, sampler=train_sub_sampler)
-                # val_loader = torch.utils.data.DataLoader(
-                #     data,
-                #     batch_size=batch_size, sampler=test_sub_sampler)
+            # Define data loaders for training and testing data in this fold
+
+            # train_loader = torch.utils.data.DataLoader(
+            #     data,
+            #     batch_size=batch_size, sampler=train_sub_sampler)
+            # val_loader = torch.utils.data.DataLoader(
+            #     data,
+            #     batch_size=batch_size, sampler=test_sub_sampler)
 
             model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
             print(model)
@@ -172,14 +178,14 @@ if __name__ == "__main__":
                 optim = SGD(model.parameters(), lr=lr, momentum=0.1, weight_decay=weight_decay)
             else:
                 raise NotImplementedError
-            
+
             if scheduler_name == 'plateau':
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=200,
-                                                        min_lr=0.1 * 1e-7,
-                                                        factor=0.1)
-            elif scheduler_name == 'multistep':    
+                                                                       min_lr=0.1 * 1e-7,
+                                                                       factor=0.1)
+            elif scheduler_name == 'multistep':
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[16, 64, 256],
-                                                            gamma=0.1)
+                                                                 gamma=0.1)
             elif scheduler_name == 'exp':
                 scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.99, last_epoch=-1)
             elif scheduler_name == 'linear':
@@ -188,19 +194,19 @@ if __name__ == "__main__":
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=0, last_epoch=-1)
             else:
                 raise NotImplementedError
-            
+
             trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs,
-                                n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
-                                weights=None, device=device, scheduler=scheduler)
+                                   n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
+                                   weights=None, device=device, scheduler=scheduler)
             best_model = trainer.train(train_loader, val_loader)
             metrics['loss'].append(best_model['loss'])
             metrics['acc'].append(best_model['acc'])
             metrics['auroc'].append(best_model['auroc'])
             metrics['epoch'].append(best_model['epoch'])
-                # model.load_state_dict(best_model['model_state_dict'])
+            # model.load_state_dict(best_model['model_state_dict'])
             print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
             with open(os.path.join(paths['save_path'], f'{args.split_seed}.pkl'),
-                    'wb') as f:
+                      'wb') as f:
                 pickle.dump(metrics, f)
             # with open(os.path.join(paths['save_path'], f'{eeg_enc_name}_{batch_size}_{lr}_{epochs}_{optim_name}.pkl'),
             #           'wb') as f:
