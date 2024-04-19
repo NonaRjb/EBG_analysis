@@ -21,11 +21,12 @@ class EBG4(Dataset):
 
         self.root_path = root_path
         if pick_subjects == 0:
-            if data_type != 'source':
-                subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]    
-            else:
-                subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
-            print("***** Training On All Available Subject *****")
+            # if data_type != 'source':
+            #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]    
+            # else:
+            #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+            # print("***** Training On All Available Subject *****")
+            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
         else:
             subjects = [pick_subjects]
             print(f"***** Training On Subject {pick_subjects}")
