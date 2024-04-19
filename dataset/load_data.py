@@ -21,9 +21,8 @@ def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: i
 
     if dataset_name == 'ebg1':
         path = os.path.join(path, "ebg1")
-        data = EBG1(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'], fmax=kwargs['fmax'],
-                    binary=kwargs['binary'], freqs=kwargs['tfr_freqs'],
-                    modality=kwargs['modality'])
+        data = EBG1(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], w=kwargs['w'], pick_subjects=subject_id,
+                    binary=kwargs['binary'], modality=kwargs['modality'])
     elif dataset_name == 'ebg1_tfr':
         data = EBG1TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'])

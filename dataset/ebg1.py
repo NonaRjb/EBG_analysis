@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.io as scio
+import pickle
 import torch
 from torch.utils.data import Dataset
 import os
@@ -13,18 +14,23 @@ class EBG1(Dataset):
             self, root_path: str,
             tmin: float = None,
             tmax: float = None,
-            fmin: float = None,
-            fmax: float = None,
+            w: float = None,
             binary: bool = True,
-            freqs: np.ndarray = None,
-            modality: str = 'ebg'
+            modality: str = 'ebg',
+            pick_subjects: int = 0
     ):
 
         self.root_path = root_path
-        recordings = ['SL06_' + str("{:02d}".format(subject_id)) + '.mat' for subject_id in range(1, 31) if
-                      subject_id != 4]
-        indices_to_keep = scio.loadmat(os.path.join(root_path, 'kept_indices_dataset1.mat'))
-        indices_to_keep = indices_to_keep['kept_trials']
+        if pick_subjects == 0:
+            recordings = ['SL06_' + str("{:02d}".format(subject_id)) + '.mat' for subject_id in range(1, 31) if
+                          subject_id != 4]
+        else:
+            recordings = ['SL06_' + str("{:02d}".format(pick_subjects)) + '.mat']
+
+        with open(os.path.join(root_path, 'kept_indices_dataset1.pkl'), 'rb') as f:
+            indices_to_keep = pickle.load(f)
+        # indices_to_keep = scio.loadmat(os.path.join(root_path, 'kept_indices_dataset1.mat'))
+        # indices_to_keep = indices_to_keep['kept_trials']
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2
@@ -34,12 +40,11 @@ class EBG1(Dataset):
         self.fs = None
         self.time_vec = None
         self.class_weight = None
-        self.freqs = freqs
         self.modality = modality
 
         for i, recording in enumerate(recordings):
             file = os.path.join(root_path, recording)
-            init_data, label, time_vec, fs = load_ebg1_mat(file, indices_to_keep[0][i])
+            init_data, label, time_vec, fs = load_ebg1_mat(file, indices_to_keep[recording])
 
             if self.fs is None:
                 self.fs = fs.astype(float)
@@ -68,20 +73,18 @@ class EBG1(Dataset):
         else:
             self.t_min = np.abs(self.time_vec - tmin).argmin()
 
-        if tmax is None:
-            self.t_max = len(self.time_vec)
+        if w is None:
+            if tmax is None:
+                self.t_max = len(self.time_vec)
+            else:
+                self.t_max = np.abs(self.time_vec - tmax).argmin()
         else:
-            self.t_max = np.abs(self.time_vec - tmax).argmin()
-
-        if fmin is None:
-            self.f_min = 0
-        else:
-            self.f_min = np.abs(self.freqs - fmin).argmin()
-
-        if fmax is None:
-            self.f_max = len(self.freqs)
-        else:
-            self.f_max = np.abs(self.freqs - fmax).argmin()
+            if tmin is None:
+                self.t_max = int(w * self.fs)
+            else:
+                tmax = tmin + w
+                self.t_max = np.abs(self.time_vec - tmax).argmin()
+        print(f"first time sample: {self.t_min}, last time sample: {self.t_max}")
 
         self.baseline_min = np.abs(self.time_vec - self.baseline_min).argmin()
         self.baseline_max = np.abs(self.time_vec - self.baseline_max).argmin()
@@ -97,7 +100,12 @@ class EBG1(Dataset):
             # ])
             class_0_count = new_labels.count(0.)
             class_1_count = new_labels.count(1.)
+            print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
             self.class_weight = torch.tensor(class_0_count/class_1_count)
+        else:
+            new_labels = [y/10-1 for y in self.labels]
+            self.labels = new_labels
+            print(f"new_labels = {set(new_labels)}")
 
         self.data = self.init_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
@@ -110,13 +118,12 @@ class EBG1(Dataset):
         if torch.is_tensor(item):
             item = item.tolist()
         sample = torch.from_numpy(self.data[item, ...])
-        label = self.labels[item]
-        return sample, label
+        return sample, self.labels[item]
 
 
 if __name__ == "__main__":
-    data_args = {'tmin': None, 'tmax': None, 'transform': None, 'freqs': np.linspace(20, 100, 160)}
-    ebg_dataset = EBG1(root_path='/Users/nonarajabi/Desktop/KTH/Smell/Novel_Bulb_measure/data/', **data_args)
+    data_args = {'tmin': 0.1, 'tmax': 0.3, 'pick_subjects': 9}
+    ebg_dataset = EBG1(root_path='/Volumes/T5 EVO/Smell/ebg1/', **data_args)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_ebg.npy'), ebg_dataset.ebg)
     # np.save(os.path.join("/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/", 'ebg1_tfr_20_100_labels.npy'),
     #         np.array(ebg_dataset.labels))
