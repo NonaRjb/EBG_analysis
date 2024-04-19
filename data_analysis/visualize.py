@@ -7,7 +7,6 @@ import re
 
 
 def compare_logreg_c(root_path, save_path):
-
     pattern = r's\d+_c([\d.]+)\.npy'
 
     subjects = os.listdir(root_path)
@@ -42,6 +41,68 @@ def compare_logreg_c(root_path, save_path):
         print(f"maximum auc median: {medians[max_key]}, C = {max_key}")
 
     return
+
+
+def plot_logreg_win_res(root_path, w_size, save_path):
+    subjects = [i for i in range(1, 26) if i != 10]
+    aucs_subj = {}
+    best_medians_subj = {}
+    best_medians_all = []
+    best_tmins = []
+    for subject in subjects:
+        path = os.path.join(root_path, str(subject))
+        tmin_files = os.listdir(path)
+        aucs_subj[str(subject)] = {}
+        for f in tmin_files:
+            t = f[:-4]
+            aucs_subj[str(subject)][t] = np.load(os.path.join(path, f))
+
+        tmin_keys = list(aucs_subj[str(subject)].keys())
+        tmin_keys = [float(tmin_key) for tmin_key in tmin_keys]
+        tmin_keys.sort()
+
+        auc_sorted = {str(i): aucs_subj[str(subject)][str(i)] for i in tmin_keys}
+        auc_subj = auc_sorted.values()
+        t_keys = auc_sorted.keys()
+
+        plt.figure(figsize=(40, 6))
+        plt.boxplot(auc_subj, labels=t_keys)
+        plt.grid(axis='y', color='0.97')
+        plt.title('Boxplot of AUC Scores for Each Subject')
+        plt.xlabel('Subject ID')
+        plt.ylabel('AUC Score')
+        plt.axhline(y=0.5, color='r', linestyle='--')
+        plt.savefig(
+            os.path.join(save_path, "w" + str(w_size), f"auc_box_plot_logreg_w{w_size}_s{subject}.png"))
+        plt.close()
+
+        best_param, best_performance = find_best_param(auc_sorted)
+        print(f"Best Tmin for Subject {subject} with Window Size {w_size} s is {best_param}")
+        best_medians_subj[str(subject)] = auc_sorted[best_param]
+        best_medians_all.append(best_performance)
+        best_tmins.append(float(best_param))
+
+    auc_scores = best_medians_subj.values()
+    auc_keys = best_medians_subj.keys()
+    plt.boxplot(auc_scores, labels=auc_keys)
+    plt.axhline(y=0.5, color='r', linestyle='--')
+    plt.title('Boxplot of Best AUC Scores for Each Subject')
+    plt.xlabel('Subject ID')
+    plt.ylabel('AUC Score')
+    plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_logreg_all_subjects.png"))
+    plt.close()
+
+    plt.boxplot(best_medians_all, labels=["Logistic Regression"])
+    plt.axhline(y=0.5, color='r', linestyle='--')
+    plt.title(f'Boxplot of Best AUC Scores for All Subjects Window Size {w_size}')
+    plt.xlabel('Model')
+    plt.ylabel('AUC Score')
+    plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_logreg_single_plot.png"))
+    plt.close()
+
+    np.save(os.path.join(save_path, "w" + str(w_size), "logreg_w" + str(w_size) + ".npy"), np.asarray(best_medians_all))
+    np.save(os.path.join(save_path, "w" + str(w_size), "logreg_t_w" + str(w_size) + ".npy"),
+            np.asarray(best_tmins))
 
 
 def load_dnn_subj_results(root_path):
@@ -98,11 +159,13 @@ def plot_dnn_res(root_path, save_path):
 
 def plot_dnn_win_res(root_path, w_size, save_path):
     root_path = os.path.join(root_path, "ebg4_sensor_ica_eegnet1d_ebg_w" + str(w_size))
-    subjects = [i for i in range(1, 26) if i != 10]
+    # subjects = [i for i in range(1, 26) if i != 10]
+    subjects = [0]
     auc_dict = {}
     epoch_dict = {}
     best_medians_subj = {}
     best_medians_all = []
+    best_tmins = []
     for subject in subjects:
         auc_dict[str(subject)] = {}
         epoch_dict[str(subject)] = {}
@@ -132,13 +195,14 @@ def plot_dnn_win_res(root_path, w_size, save_path):
         axs[1].set_title(f'Boxplot of Epochs for Best AUC Scores for Subject {subject} per Each Tmin')
         axs[1].set_ylabel('Epochs')
         axs[1].set_xlabel('Subject ID')
-        plt.savefig(os.path.join(save_path, str(w_size), f"box_plot_eegnet1d_s{subject}.png"))
+        plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_eegnet1d_s{subject}.png"))
         plt.close(fig)
 
         best_param, best_performance = find_best_param(auc_sorted)
         print(f"Best Tmin for Subject {subject} with Window Size {w_size} s is {best_param}")
         best_medians_subj[str(subject)] = auc_sorted[best_param]
         best_medians_all.append(best_performance)
+        best_tmins.append(float(best_param))
 
     auc_scores = best_medians_subj.values()
     auc_keys = best_medians_subj.keys()
@@ -147,15 +211,50 @@ def plot_dnn_win_res(root_path, w_size, save_path):
     plt.title('Boxplot of Best AUC Scores for Each Subject')
     plt.xlabel('Subject ID')
     plt.ylabel('AUC Score')
-    plt.savefig(os.path.join(save_path, str(w_size), f"box_plot_eegnet1d_all_subjects.png"))
+    plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_eegnet1d_all_subjects.png"))
     plt.close()
 
-    plt.boxplot(best_medians_all, labels=["EEGNet1D"])
+    # plt.boxplot(best_medians_all, labels=["EEGNet1D"])
+    # plt.axhline(y=0.5, color='r', linestyle='--')
+    # plt.title(f'Boxplot of Best AUC Scores for All Subjects Window Size {w_size}')
+    # plt.xlabel('Model')
+    # plt.ylabel('AUC Score')
+    # plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_eegnet1d_single_plot.png"))
+    # plt.close()
+    #
+    # np.save(os.path.join(save_path, "w" + str(w_size), "eegnet1d_w" + str(w_size) + ".npy"),
+    #         np.asarray(best_medians_all))
+    # np.save(os.path.join(save_path, "w" + str(w_size), "eegnet1d_t_w" + str(w_size) + ".npy"),
+    #         np.asarray(best_tmins))
+
+
+def compare_models(save_path):
+    eegnet1d_path = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/w0.5/"
+    logreg_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/w0.1/"
+
+    aucs = {
+        'EEGNet1D': np.load(os.path.join(eegnet1d_path, "eegnet1d_w0.5.npy")),
+        'LogReg': np.load(os.path.join(logreg_path, "logreg_w0.1.npy"))
+    }
+
+    tmins = {
+        'EEGNet1D': np.load(os.path.join(eegnet1d_path, "eegnet1d_t_w0.5.npy")),
+        'LogReg': np.load(os.path.join(logreg_path, "logreg_t_w0.1.npy"))
+    }
+
+    plt.boxplot(aucs.values(), labels=aucs.keys())
     plt.axhline(y=0.5, color='r', linestyle='--')
-    plt.title(f'Boxplot of Best AUC Scores for All Subjects Window Size {w_size}')
+    plt.title(f'Compare Best AUC Scores for Each Model')
     plt.xlabel('Model')
     plt.ylabel('AUC Score')
-    plt.savefig(os.path.join(save_path, str(w_size), f"box_plot_eegnet1d_single_plot.png"))
+    plt.savefig(os.path.join(save_path, f"box_plot_compare_models.png"))
+    plt.close()
+
+    plt.boxplot(tmins.values(), labels=tmins.keys())
+    plt.title(f'Compare Best tmins for Each Model')
+    plt.xlabel('Model')
+    plt.ylabel('tmin')
+    plt.savefig(os.path.join(save_path, f"box_plot_compare_tmins.png"))
     plt.close()
 
 
@@ -166,6 +265,10 @@ if __name__ == "__main__":
         path_to_data = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/grid_search_c"
         path_to_save = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/ebg4_auc_box_plot"
         compare_logreg_c(path_to_data, path_to_save)
+    elif task == "plot_logreg_win_res":
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
+        plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_ebg"
         path_to_save = "/Volumes/T5 EVO/Smell"
@@ -174,3 +277,6 @@ if __name__ == "__main__":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/"
         plot_dnn_win_res(path_to_data, 0.5, path_to_save)
+    elif task == "compare_models":
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/compare_models"
+        compare_models(path_to_save)
