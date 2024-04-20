@@ -257,15 +257,15 @@ if __name__ == "__main__":
     w = args.w
 
     save_path = os.path.join(save_path, "plots")
-    save_path = os.path.join(save_path, "grid_search_c")
+    save_path = os.path.join(save_path, "grid_search_c_tmin")
     os.makedirs(save_path, exist_ok=True)
     save_path = os.path.join(save_path, dataset_name)
-
+    os.makedirs(save_path, exist_ok=True)
     data_path = os.path.join(data_path, dataset_name)
 
     if args.subject_id == 0:
         if dataset_name == "ebg1":
-            subject_ids = [i for i in range(1, 31) if i != 4]
+            subject_ids = [i for i in range(1, 3) if i != 4]
         elif dataset_name == "ebg4":
             subject_ids = [i for i in range(1, 38) if i != 10]
         else:
@@ -292,7 +292,11 @@ if __name__ == "__main__":
             tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
 
             # crop the time interval of interest
-            tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs)
+            tfr = crop_tfr(tfr,
+                           tmin=args.tmin, tmax=args.tmax,
+                           fmin=args.fmin, fmax=args.fmax,
+                           tvec=t, freqs=freqs,
+                           w=w)
             # take the mean over channels
             tfr_mean = tfr.mean(axis=1).squeeze()
             n_trials = tfr_mean.shape[0]
@@ -330,7 +334,7 @@ if __name__ == "__main__":
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
-                csp.fit(X_train, y_train)
+                # csp.fit(X_train, y_train)
 
                 # Count samples from each class in train and test sets
                 unique_train, counts_train = np.unique(y_train, return_counts=True)
@@ -344,6 +348,14 @@ if __name__ == "__main__":
                 prob_scores = clf.predict_proba(X_test)[:, 1]
                 auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
                 scores[str(subj)].append(auc_score)
+
+            if args.save is True:
+                print("Saving the AUC Scores")
+                os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
+                np.save(
+                    os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy"),
+                    np.asarray(scores)
+                )
         score_values = scores.values()
         score_keys = scores.keys()
         plt.figure(figsize=(40, 6))
@@ -354,15 +366,8 @@ if __name__ == "__main__":
         plt.axhline(y=0.5, color='r', linestyle='--')
         plt.savefig(
             os.path.join(save_path,
-                         f"auc_box_plot_log_reg_{args.tmin}_{args.tmax}_{args.fmin}_{args.fmax}.png"))
-        if args.save is True:
-            print("Saving the AUC Scores")
-            np.save(
-                os.path.join(save_path, str(args.subject_id),
-                             f"auc_scores_all_subjects.npy"),
-                np.asarray(scores)
-            )
-        plt.show()
+                         f"auc_box_plot_log_reg_t{args.tmin}_w{args.w}_c{c}.png"))
+        # plt.show()
     else:
 
         data_array, labels_array, t, sfreq = \
