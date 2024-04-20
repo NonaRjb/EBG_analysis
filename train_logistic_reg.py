@@ -21,7 +21,7 @@ cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Volumes/T5 EVO/Smell/"
 
-c_dict = {
+c_dict_ebg4 = {
     '1': 1.0,
     '2': 1.0,
     '3': 64.0,
@@ -56,7 +56,100 @@ def confusion_matrix_scorer(clf_, X_, y):
             'fn': cm[1, 0], 'tp': cm[1, 1]}
 
 
-def load_eeg_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_lim=None, binary=True):
+def load_data(name, root_path, subject_id, data_type, modality, tmin, tmax, bl_lim, binary):
+    if name == "ebg1":
+        return  load_ebg1_array(
+            root_path=root_path,
+            subject_id=subject_id,
+            modality=modality,
+            tmin=tmin,
+            tmax=tmax,
+            bl_lim=None,
+            binary=binary
+        )
+    elif name == "ebg4":
+        return  load_ebg4_array(
+            root_path=root_path,
+            subject_id=subject_id,
+            data_type=data_type,
+            modality=modality,
+            tmin=tmin,
+            tmax=tmax,
+            bl_lim=bl_lim,
+            binary=binary
+        )
+
+def load_ebg1_array(root_path, subject_id, modality, tmin, tmax, bl_lim=None, binary=True):
+    self.root_path = root_path
+    # if subject_id == 0:
+    #     recordings = ['SL06_' + str("{:02d}".format(subject_id)) + '.mat' for subject_id in range(1, 31) if
+    #                   subject_id != 4]
+    # else:
+    recordings = ['SL06_' + str("{:02d}".format(subject_id)) + '.mat']
+    with open(os.path.join(root_path, 'kept_indices_dataset1.pkl'), 'rb') as f:
+        indices_to_keep = pickle.load(f)
+
+    data = None
+    labels = None
+    fs = None
+    time_vec = None
+    for i, recording in enumerate(recordings):
+        file = os.path.join(root_path, recording)
+        data_subj, label_subj, time_vec_subj, fs_subj = \
+            load_ebg1_mat(file, indices_to_keep[recording])
+        if fs is None:
+            fs = float(fs_subj)
+        if time_vec is None:
+            time_vec = time_vec_subj
+
+        if modality == 'eeg':
+            init_data = init_data[:, :64, :]
+        elif modality == 'ebg':
+            init_data = init_data[:, 64:, :]
+        else:
+            pass
+        
+        if data is None:
+            data = data_subj
+            labels = np.expand_dims(label_subj, axis=1)
+        else:
+            data = np.vstack((data, data_subj))
+            labels = np.vstack((labels, np.expand_dims(label_subj, axis=1)))
+    
+    if tmin is None:
+        t_min = 0
+    else:
+        t_min = np.abs(time_vec - tmin).argmin()
+    if tmax is None:
+        t_max = len(time_vec)
+    else:
+        t_max = np.abs(time_vec - tmax).argmin()
+    
+    if binary:
+        new_labels = [1. if label == 40 else 0. for label in labels]
+        labels = new_labels
+        class_0_count = new_labels.count(0.)
+        class_1_count = new_labels.count(1.)
+        print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
+        self.class_weight = torch.tensor(class_0_count/class_1_count)
+    else:
+        new_labels = [y/10-1 for y in labels]
+        labels = new_labels
+        print(f"new_labels = {set(new_labels)}")
+
+    if bl_lim is not None:
+        baseline_min = np.abs(time_vec - bl_lim[0]).argmin()
+        baseline_max = np.abs(time_vec - bl_lim[1]).argmin()
+        baseline = np.mean(data[..., baseline_min:baseline_max], axis=(0, -1), keepdims=True)
+        data = data[..., t_min:t_max] - baseline
+    else:
+        data = data[..., t_min:t_max]
+
+    return data, labels, time_vec, fs
+
+
+
+def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_lim=None, binary=True):
     # if subject_id == 0:
     #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
     # else:
@@ -155,7 +248,6 @@ if __name__ == "__main__":
         data_path = cluster_data_path
         save_path = cluster_save_path
 
-    save_path = os.path.join(save_path, "plots", "grid_search_tmin")
     args = parse_args()
 
     dataset_name = args.data
@@ -163,22 +255,35 @@ if __name__ == "__main__":
     c = args.c
     w = args.w
 
-    data_path = os.path.join(data_path, "ebg4")
+    save_path = os.path.join(save_path, "plots")
+    save_path = os.path.join(save_path, "grid_search_c")
+    os.makedirs(save_path, exist_ok=True)
+    save_path = os.path.join(save_path, dataset_name)
+
+    data_path = os.path.join(data_path, dataset_name)
 
     if args.subject_id == 0:
-        subject_ids = [i for i in range(1, 38) if i != 10]
+        if dataset_name == "ebg1":
+            subject_ids = [i for i in range(1, 31) if i != 4]
+        elif dataset_name == "ebg4":
+            subject_ids = [i for i in range(1, 38) if i != 10]
+        else:
+            raise NotImplementedError
+
         scores = {}
         for subj in subject_ids:
-            data_array, labels_array, t, sfreq = \
-                load_eeg_array(
-                    root_path=data_path,
-                    subject_id=subj,
-                    data_type=args.data_type,
-                    modality=args.modality,
-                    tmin=None,
-                    tmax=None,
-                    bl_lim=None
-                )
+            data_array, labels_array, t, sfreq = load_data(
+                name=dataset_name, 
+                root_path=data_path,
+                subject_id=subj,
+                data_type=args.data_type,
+                modality=args.modality,
+                tmin=None,
+                tmax=None,
+                bl_lim=None,
+                binary=True
+            )
+                
 
             freqs = np.arange(20, 100)
             tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
@@ -208,7 +313,7 @@ if __name__ == "__main__":
 
                 clf = make_pipeline(# StandardScaler(),
                                     # csp,
-                                    LogisticRegression(C=c_dict[str(subj)], penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                                    LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                        max_iter=2000,
                                                        random_state=seed))
                 # clf = make_pipeline(  # StandardScaler(),
@@ -262,14 +367,16 @@ if __name__ == "__main__":
     else:
 
         data_array, labels_array, t, sfreq = \
-            load_eeg_array(
+            load_data(
+                name=dataset_name, 
                 root_path=data_path,
                 subject_id=args.subject_id,
                 data_type=args.data_type,
                 modality=args.modality,
                 tmin=None,
                 tmax=None,
-                bl_lim=None
+                bl_lim=None,
+                binary=True
             )
 
         freqs = np.arange(20, 100)
@@ -290,7 +397,7 @@ if __name__ == "__main__":
         csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
         clf = make_pipeline(# StandardScaler(),
                             # csp,
-                            LogisticRegression(C=c_dict[str(args.subject_id)], penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                            LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                                max_iter=2000,
                                                random_state=seed))
 
@@ -318,13 +425,13 @@ if __name__ == "__main__":
             print("Saving the AUC Scores")
             os.makedirs(os.path.join(save_path, str(args.subject_id)), exist_ok=True)
             np.save(
-                os.path.join(save_path, str(args.subject_id), f"{args.tmin}.npy"),
+                os.path.join(save_path, str(args.subject_id), f"{c}.npy"),
                 np.asarray(scores)
             )
         plt.boxplot(scores, labels=[str(args.subject_id)])
         plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.title(f"AUC Scores Subject {args.subject_id}, tmin = {args.tmin}")
+        plt.title(f"AUC Scores Subject {args.subject_id}, C = {c}")
         os.makedirs(os.path.join(save_path, "plots"), exist_ok=True)
         os.makedirs(os.path.join(save_path, "plots", str(args.subject_id)), exist_ok=True)
-        plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"s{args.subject_id}_t{args.tmin}.png"))
+        plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"s{args.subject_id}_c{c}.png"))
         # plt.show()

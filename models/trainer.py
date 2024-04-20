@@ -75,7 +75,8 @@ class ModelTrainer:
 
                 with autocast(enabled=self.mixed_precision):
                     preds = self.model(x)
-                    preds = preds.squeeze()
+                    if len(preds.shape) > 1:
+                        preds = preds.squeeze(dim=1)
                     if self.n_classes == 2:
                         loss_classification = self.loss_cls(preds, y)
                     else:
@@ -192,7 +193,8 @@ class ModelTrainer:
 
                 with autocast(enabled=self.mixed_precision):
                     preds = model(x)
-                    preds = preds.squeeze()
+                    if len(preds.shape) > 1:
+                        preds = preds.squeeze(dim=1)
                     if self.n_classes == 2:
                         loss_classification = self.loss_cls(preds, y)
                     else:
