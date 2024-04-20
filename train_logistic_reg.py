@@ -8,7 +8,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import cross_validate
 from mne.decoding import CSP, UnsupervisedSpatialFilter
+from dataset.data_utils import load_ebg1_mat
 import matplotlib.pyplot as plt
+import pickle
 import numpy as np
 import argparse
 import math
@@ -58,7 +60,7 @@ def confusion_matrix_scorer(clf_, X_, y):
 
 def load_data(name, root_path, subject_id, data_type, modality, tmin, tmax, bl_lim, binary):
     if name == "ebg1":
-        return  load_ebg1_array(
+        return load_ebg1_array(
             root_path=root_path,
             subject_id=subject_id,
             modality=modality,
@@ -68,7 +70,7 @@ def load_data(name, root_path, subject_id, data_type, modality, tmin, tmax, bl_l
             binary=binary
         )
     elif name == "ebg4":
-        return  load_ebg4_array(
+        return load_ebg4_array(
             root_path=root_path,
             subject_id=subject_id,
             data_type=data_type,
@@ -79,8 +81,9 @@ def load_data(name, root_path, subject_id, data_type, modality, tmin, tmax, bl_l
             binary=binary
         )
 
+
 def load_ebg1_array(root_path, subject_id, modality, tmin, tmax, bl_lim=None, binary=True):
-    self.root_path = root_path
+    root_path = root_path
     # if subject_id == 0:
     #     recordings = ['SL06_' + str("{:02d}".format(subject_id)) + '.mat' for subject_id in range(1, 31) if
     #                   subject_id != 4]
@@ -103,19 +106,19 @@ def load_ebg1_array(root_path, subject_id, modality, tmin, tmax, bl_lim=None, bi
             time_vec = time_vec_subj
 
         if modality == 'eeg':
-            init_data = init_data[:, :64, :]
+            data_subj = data_subj[:, :64, :]
         elif modality == 'ebg':
-            init_data = init_data[:, 64:, :]
+            data_subj = data_subj[:, 64:, :]
         else:
             pass
-        
+
         if data is None:
             data = data_subj
             labels = np.expand_dims(label_subj, axis=1)
         else:
             data = np.vstack((data, data_subj))
             labels = np.vstack((labels, np.expand_dims(label_subj, axis=1)))
-    
+
     if tmin is None:
         t_min = 0
     else:
@@ -124,16 +127,15 @@ def load_ebg1_array(root_path, subject_id, modality, tmin, tmax, bl_lim=None, bi
         t_max = len(time_vec)
     else:
         t_max = np.abs(time_vec - tmax).argmin()
-    
+
     if binary:
         new_labels = [1. if label == 40 else 0. for label in labels]
         labels = new_labels
         class_0_count = new_labels.count(0.)
         class_1_count = new_labels.count(1.)
         print(f"N(class 0) = {class_0_count}, N(class 1) = {class_1_count}")
-        self.class_weight = torch.tensor(class_0_count/class_1_count)
     else:
-        new_labels = [y/10-1 for y in labels]
+        new_labels = [y / 10 - 1 for y in labels]
         labels = new_labels
         print(f"new_labels = {set(new_labels)}")
 
@@ -146,7 +148,6 @@ def load_ebg1_array(root_path, subject_id, modality, tmin, tmax, bl_lim=None, bi
         data = data[..., t_min:t_max]
 
     return data, labels, time_vec, fs
-
 
 
 def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_lim=None, binary=True):
@@ -240,7 +241,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "remote"
+    loc = "local"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -273,7 +274,7 @@ if __name__ == "__main__":
         scores = {}
         for subj in subject_ids:
             data_array, labels_array, t, sfreq = load_data(
-                name=dataset_name, 
+                name=dataset_name,
                 root_path=data_path,
                 subject_id=subj,
                 data_type=args.data_type,
@@ -283,7 +284,6 @@ if __name__ == "__main__":
                 bl_lim=None,
                 binary=True
             )
-                
 
             freqs = np.arange(20, 100)
             tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
@@ -306,16 +306,15 @@ if __name__ == "__main__":
             y = np.asarray(labels_array)
 
             csp = CSP(n_components=4, reg=1e-05, log=None, transform_into='average_power', norm_trace=False)
-            
+
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             scores[str(subj)] = []
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-
-                clf = make_pipeline(# StandardScaler(),
-                                    # csp,
-                                    LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
-                                                       max_iter=2000,
-                                                       random_state=seed))
+                clf = make_pipeline(  # StandardScaler(),
+                    # csp,
+                    LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                                       max_iter=2000,
+                                       random_state=seed))
                 # clf = make_pipeline(  # StandardScaler(),
                 #     csp,
                 #     LinearDiscriminantAnalysis())
@@ -368,7 +367,7 @@ if __name__ == "__main__":
 
         data_array, labels_array, t, sfreq = \
             load_data(
-                name=dataset_name, 
+                name=dataset_name,
                 root_path=data_path,
                 subject_id=args.subject_id,
                 data_type=args.data_type,
@@ -395,11 +394,11 @@ if __name__ == "__main__":
         y = np.asarray(labels_array)
 
         csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
-        clf = make_pipeline(# StandardScaler(),
-                            # csp,
-                            LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
-                                               max_iter=2000,
-                                               random_state=seed))
+        clf = make_pipeline(  # StandardScaler(),
+            # csp,
+            LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                               max_iter=2000,
+                               random_state=seed))
 
         skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
 
