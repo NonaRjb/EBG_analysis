@@ -100,7 +100,7 @@ def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: i
         # test_data = data_utils.MapDataset(test_data, data_transforms)
 
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False,
-                                   drop_last=True,
+                                   drop_last=False,
                                    pin_memory=True if device == 'cuda' else False,
                                    generator=g)
     if val_size > 0:
