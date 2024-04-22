@@ -241,7 +241,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "local"
+    loc = "remote"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -265,9 +265,9 @@ if __name__ == "__main__":
 
     if args.subject_id == 0:
         if dataset_name == "ebg1":
-            subject_ids = [i for i in range(1, 3) if i != 4]
+            subject_ids = [i for i in range(1, 31) if i != 4]
         elif dataset_name == "ebg4":
-            subject_ids = [i for i in range(1, 38) if i != 10]
+            subject_ids = [i for i in range(1, 26) if i != 10]
         else:
             raise NotImplementedError
 
@@ -354,19 +354,19 @@ if __name__ == "__main__":
                 os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
                 np.save(
                     os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy"),
-                    np.asarray(scores)
+                    np.asarray(scores[str(subj)])
                 )
-        score_values = scores.values()
-        score_keys = scores.keys()
-        plt.figure(figsize=(40, 6))
-        plt.boxplot(score_values, labels=score_keys)
-        plt.title('Boxplot of AUC Scores for Each Subject ')
-        plt.xlabel('Subject ID')
-        plt.ylabel('AUC Score')
-        plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.savefig(
-            os.path.join(save_path,
-                         f"auc_box_plot_log_reg_t{args.tmin}_w{args.w}_c{c}.png"))
+        # score_values = scores.values()
+        # score_keys = scores.keys()
+        # plt.figure(figsize=(40, 6))
+        # plt.boxplot(score_values, labels=score_keys)
+        # plt.title('Boxplot of AUC Scores for Each Subject ')
+        # plt.xlabel('Subject ID')
+        # plt.ylabel('AUC Score')
+        # plt.axhline(y=0.5, color='r', linestyle='--')
+        # plt.savefig(
+        #     os.path.join(save_path,
+        #                  f"auc_box_plot_log_reg_t{args.tmin}_w{args.w}_c{c}.png"))
         # plt.show()
     else:
 
