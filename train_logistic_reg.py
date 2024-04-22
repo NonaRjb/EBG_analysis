@@ -265,7 +265,7 @@ if __name__ == "__main__":
 
     if args.subject_id == 0:
         if dataset_name == "ebg1":
-            subject_ids = [i for i in range(1, 3) if i != 4]
+            subject_ids = [i for i in range(1, 31) if i != 4]
         elif dataset_name == "ebg4":
             subject_ids = [i for i in range(1, 38) if i != 10]
         else:
