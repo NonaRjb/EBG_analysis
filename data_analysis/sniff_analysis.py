@@ -39,6 +39,11 @@ if __name__ == "__main__":
         data_path = cluster_data_path
         save_path = cluster_save_path
     data_path = os.path.join(data_path, "ebg4")
+    save_path = os.path.join(save_path, "plots")
+    save_path = os.path.join(save_path, "sniff")
+    os.makedirs(save_path, exist_ok=True)
+    save_path = os.path.join(save_path, "grid_search_c")
+    os.makedirs(save_path, exist_ok=True)
 
     args = parse_args()
     seed = args.seed
@@ -93,12 +98,20 @@ if __name__ == "__main__":
                 auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
                 scores[str(subject)].append(auc_score)
 
-        score_values = scores.values()
-        score_keys = scores.keys()
-        plt.figure(figsize=(40, 6))
-        plt.boxplot(score_values, labels=score_keys)
-        plt.title('Boxplot of AUC Scores for Each Subject ')
-        plt.xlabel('Subject ID')
-        plt.ylabel('AUC Score')
-        plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.show()
+            if args.save is True:
+                print("Saving the AUC Scores")
+                os.makedirs(os.path.join(save_path, str(subject)), exist_ok=True)
+                np.save(
+                    os.path.join(save_path, str(subject), f"c{c}.npy"),
+                    np.asarray(scores[str(subject)])
+                )
+
+        # score_values = scores.values()
+        # score_keys = scores.keys()
+        # plt.figure(figsize=(40, 6))
+        # plt.boxplot(score_values, labels=score_keys)
+        # plt.title('Boxplot of AUC Scores for Each Subject ')
+        # plt.xlabel('Subject ID')
+        # plt.ylabel('AUC Score')
+        # plt.axhline(y=0.5, color='r', linestyle='--')
+        # plt.show()
