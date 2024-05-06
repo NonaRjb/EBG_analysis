@@ -1,8 +1,10 @@
+import pickle
 from typing import Any
 from pywt import wavedec
 import mne
 import torch
 import scipy.io as scio
+from scipy.signal import resample
 import mat73
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
@@ -98,10 +100,12 @@ def load_ebg4(root, subject_id, data_type):
         filename = "preprocessed_data_ica.mat"
         file = os.path.join(root, str(subject_id), filename)
         data, labels, time, fs = load_sensor_ica_ebg4(file)
+    elif data_type == "sniff":
+        filename = "s" + str("{:02d}".format(subject_id)) + "_sniff.pkl"
+        file = os.path.join(root, str(subject_id), filename)
+        data, labels, time, fs = load_ebg4_sniff(file)
     else:
         raise NotImplementedError
-
-    time = np.asarray(time)
 
     return data, labels, time, fs
 
@@ -111,6 +115,7 @@ def load_sensor_ebg4(filename):
     data_struct = mat73.loadmat(filename)
     data = np.asarray(data_struct['data_eeg']['trial'])
     time = data_struct['data_eeg']['time'][0]
+    time = np.asarray(time)
     labels = data_struct['data_eeg']['trialinfo'].squeeze()
     labels = labels[:, 0]
     fs = 512
@@ -123,6 +128,7 @@ def load_sensor_ica_ebg4(filename):
     data_struct = mat73.loadmat(filename)
     data = np.asarray(data_struct['data_eeg_ica']['trial'])
     time = data_struct['data_eeg_ica']['time'][0]
+    time = np.asarray(time)
     labels = data_struct['data_eeg_ica']['trialinfo'].squeeze()
     labels = labels[:, 0]
     fs = 512
@@ -148,8 +154,57 @@ def load_source_ebg4(filename):
         labels = data_struct['source_data_ROI']['trialinfo'][0][0].squeeze()
     fs = 512
     labels = labels[:, 0]
+    time = np.asarray(time)
 
     return data, labels, time, fs
+
+
+def load_ebg4_sniff(filename):
+
+    fs = 400
+    fs_new = 512
+    # orig_times = np.arange(-1., 4., 1/fs)
+    times_new = np.arange(-1., 4., 1/fs_new)
+
+    with open(filename, "rb") as f:
+        data_dict = pickle.load(f)
+
+    trials = data_dict['trials']
+    labels = data_dict['labels']
+
+    trials_resampled = resample(trials, num=int(fs_new/fs*trials.shape[-1]), axis=-1)
+
+    # trials_resampled =
+    return trials_resampled, labels, times_new, fs_new
+
+
+def load_ebg4_sniff_mat(path, save_path):
+
+    ### Function to load the sniff signal MATLAB struct and split it into per subject signals
+
+    labels_map = {
+        '1-Butanol low  ': 1,
+        '5-Nonanone low ': 2,
+        'Undecanal low  ': 4,
+        '1-Butanol high ': 8,
+        '5-Nonanone high': 16,
+        'Undecanal high ': 32,
+        'Air            ': 64
+    }
+    data_struct = scio.loadmat(path)
+    data_all = data_struct['data'][0][0]
+    for subject in range(1, 54):
+        data_subject = data_all['subject'+str("{:02d}".format(subject))][0]
+        trials_subject = data_subject['trials'][0]
+        labels_subject = data_subject['odors'][0].squeeze()
+        labels_subject = [labels_map[i[0]] for i in labels_subject]
+        data_dict = {
+            'trials': trials_subject,
+            'labels': labels_subject
+        }
+        with open(os.path.join(save_path, "s" + str("{:02d}".format(subject)) + "_sniff.pkl"), "wb") as f:
+            pickle.dump(data_dict, f)
+    return
 
 
 def crop_temporal(data, tmin, tmax, tvec):
@@ -392,15 +447,13 @@ class MeanStdNormalize:
             MeanStdNormalize(axis=0)
         ])
         # normalize along the first dimension (electrode dimension)
-        transform(torch.randn(32, 128)).shape
-        >>> (32, 128)
+        transform(torch.randn(32, 128)).shape(32, 128)
 
         transform = Concatenate([
             MeanStdNormalize(axis=1)
         ])
         # normalize along the second dimension (temproal dimension)
-        transform(torch.randn(32, 128)).shape
-        >>> (32, 128)
+        transform(torch.randn(32, 128)).shape(32, 128)
 
     Args:
         mean (np.array, optional): The mean used in the normalization process, allowing the user to provide mean statistics in :obj:`np.ndarray` format. When statistics are not provided, use the statistics of the current sample for normalization.
@@ -452,15 +505,13 @@ class MinMaxNormalize:
             MinMaxNormalize(axis=0)
         ])
         # normalize along the first dimension (electrode dimension)
-        transform(torch.randn(32, 128)).shape
-        >>> (32, 128)
+        transform(torch.randn(32, 128)).shape(32, 128)
 
         transform = Concatenate([
             MinMaxNormalize(axis=1)
         ])
         # normalize along the second dimension (temproal dimension)
-        transform(torch.randn(32, 128)).shape
-        >>> (32, 128)
+        transform(torch.randn(32, 128)).shape(32, 128)
 
     Args:
         min (np.array, optional): The minimum used in the normalization process, allowing the user to provide minimum statistics in :obj:`np.ndarray` format. When statistics are not provided, use the statistics of the current sample for normalization.
@@ -503,3 +554,11 @@ class MinMaxNormalize:
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"
+
+
+if __name__ == "__main__":
+
+    root_path = "/Volumes/T5 EVO/Smell/ebg4"
+    subject = 1
+    data_ebg, labels_ebg, times_ebg, fs_ebg = load_ebg4(root_path, subject, data_type="sensor_ica")
+    data_sniff, labels_sniff, times_sniff, fs_sniff = load_ebg4(root_path, subject, data_type="sniff")
