@@ -241,7 +241,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "remote"
+    loc = "local"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -316,7 +316,7 @@ if __name__ == "__main__":
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
                 clf = make_pipeline(  # StandardScaler(),
                     # csp,
-                    LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+                    LogisticRegression(C=c, penalty='l1', solver='liblinear', # l1_ratio=0.5,
                                        max_iter=2000,
                                        random_state=seed))
                 # clf = make_pipeline(  # StandardScaler(),

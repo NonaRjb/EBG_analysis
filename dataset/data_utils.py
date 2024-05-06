@@ -160,11 +160,10 @@ def load_source_ebg4(filename):
 
 
 def load_ebg4_sniff(filename):
-
     fs = 400
     fs_new = 512
     # orig_times = np.arange(-1., 4., 1/fs)
-    times_new = np.arange(-1., 4., 1/fs_new)
+    times_new = np.arange(-1., 4., 1 / fs_new)
 
     with open(filename, "rb") as f:
         data_dict = pickle.load(f)
@@ -172,15 +171,14 @@ def load_ebg4_sniff(filename):
     trials = data_dict['trials']
     labels = data_dict['labels']
 
-    trials_resampled = resample(trials, num=int(fs_new/fs*trials.shape[-1]), axis=-1)
+    trials_resampled = resample(trials, num=int(fs_new / fs * trials.shape[-1]), axis=-1)
 
     # trials_resampled =
     return trials_resampled, labels, times_new, fs_new
 
 
 def load_ebg4_sniff_mat(path, save_path):
-
-    ### Function to load the sniff signal MATLAB struct and split it into per subject signals
+    # Function to load the sniff signal MATLAB struct and split it into per subject signals
 
     labels_map = {
         '1-Butanol low  ': 1,
@@ -194,7 +192,7 @@ def load_ebg4_sniff_mat(path, save_path):
     data_struct = scio.loadmat(path)
     data_all = data_struct['data'][0][0]
     for subject in range(1, 54):
-        data_subject = data_all['subject'+str("{:02d}".format(subject))][0]
+        data_subject = data_all['subject' + str("{:02d}".format(subject))][0]
         trials_subject = data_subject['trials'][0]
         labels_subject = data_subject['odors'][0].squeeze()
         labels_subject = [labels_map[i[0]] for i in labels_subject]
@@ -220,7 +218,6 @@ def crop_temporal(data, tmin, tmax, tvec):
 
 
 def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None, fs=512) -> np.ndarray:
-
     """
     :param tfr: 4-d data array with the shape (n_trials, n_channels, n_freqs, n_samples)
     :return: cropped array
@@ -242,8 +239,8 @@ def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None, fs=512) -> np.nda
         else:
             tmax = tmin + w
             t_max = np.abs(tvec - tmax).argmin()
-    
-    print(f"Number of Time Samples: {t_max-t_min}")
+
+    print(f"Number of Time Samples: {t_max - t_min}")
 
     if fmin is None:
         f_min = 0
@@ -258,7 +255,6 @@ def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None, fs=512) -> np.nda
 
 
 def apply_baseline(tfr, bl_lim, tvec, mode):
-
     if bl_lim[0] is None:
         baseline_min = 0
     else:
@@ -557,6 +553,9 @@ class MinMaxNormalize:
 
 
 if __name__ == "__main__":
+
+    # load_ebg4_sniff_mat("/Volumes/T5 EVO/Smell/ebg4_sniff/trials_all_subjects_ICA_cut.mat",
+    #                     "/Volumes/T5 EVO/Smell/ebg4_sniff/ebg4_sniff_subject")
 
     root_path = "/Volumes/T5 EVO/Smell/ebg4"
     subject = 1
