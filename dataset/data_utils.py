@@ -1,6 +1,6 @@
 import pickle
 from typing import Any
-from pywt import wavedec
+# from pywt import wavedec
 import mne
 import torch
 import scipy.io as scio
@@ -296,9 +296,9 @@ def apply_baseline(tfr, bl_lim, tvec, mode):
     return tfr
 
 
-def wavelet_decompose(data, level, wavelet='db4'):
-    coeffs = wavedec(data, wavelet=wavelet, level=level)
-    return coeffs
+# def wavelet_decompose(data, level, wavelet='db4'):
+#     coeffs = wavedec(data, wavelet=wavelet, level=level)
+#     return coeffs
 
 
 def apply_tfr(in_data: np.ndarray, fs: float, freqs: np.ndarray, n_cycles: Union[np.ndarray, int] = 3.0,
