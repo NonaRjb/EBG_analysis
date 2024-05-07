@@ -35,7 +35,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "remote"
+    loc = "local"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -62,9 +62,13 @@ if __name__ == "__main__":
 
         scores = {}
         for subject in subjects:
-            data_sniff, labels_sniff, times_sniff, fs_sniff = load_ebg4(data_path, subject, data_type="sniff")
+            data_sniff, labels_sniff, times_sniff, fs_sniff = load_ebg4(
+                data_path,
+                subject,
+                data_type="sniff",
+                fs_new=200
+            )
             data_sniff_cropped = crop_temporal(data_sniff, tmin=args.tmin, tmax=args.tmax, tvec=times_sniff)
-
             new_labels = [1. if y == 64 else 0. for y in labels_sniff]
             labels_sniff = np.asarray(new_labels)
 

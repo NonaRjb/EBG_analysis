@@ -87,7 +87,7 @@ def load_ebg3_tfr(filename):
     return ebg_data, labels, time, freq
 
 
-def load_ebg4(root, subject_id, data_type):
+def load_ebg4(root, subject_id, data_type, **kwargs):
     if data_type == 'source':
         filename = "source_data.mat"
         file = os.path.join(root, str(subject_id), filename)
@@ -103,7 +103,7 @@ def load_ebg4(root, subject_id, data_type):
     elif data_type == "sniff":
         filename = "s" + str("{:02d}".format(subject_id)) + "_sniff.pkl"
         file = os.path.join(root, str(subject_id), filename)
-        data, labels, time, fs = load_ebg4_sniff(file)
+        data, labels, time, fs = load_ebg4_sniff(file, kwargs['fs_new'])
     else:
         raise NotImplementedError
 
@@ -159,11 +159,9 @@ def load_source_ebg4(filename):
     return data, labels, time, fs
 
 
-def load_ebg4_sniff(filename):
+def load_ebg4_sniff(filename, fs_new=None):
     fs = 400
-    fs_new = 512
-    # orig_times = np.arange(-1., 4., 1/fs)
-    times_new = np.arange(-1., 4., 1 / fs_new)
+    orig_times = np.arange(-1., 4., 1 / fs)
 
     with open(filename, "rb") as f:
         data_dict = pickle.load(f)
@@ -171,10 +169,15 @@ def load_ebg4_sniff(filename):
     trials = data_dict['trials']
     labels = data_dict['labels']
 
-    trials_resampled = resample(trials, num=int(fs_new / fs * trials.shape[-1]), axis=-1)
-
-    # trials_resampled =
-    return trials_resampled, labels, times_new, fs_new
+    # Low-pass filter and downsample TODO
+    if fs_new is None:
+        return trials, labels, orig_times, fs_new
+    else:
+        # low-pass filter
+        trials_filtered = mne.filter.filter_data(trials, sfreq=fs, l_freq=None, h_freq=50)
+        times_new = np.arange(-1., 4., 1 / fs_new)
+        trials_resampled = resample(trials_filtered, num=int(fs_new / fs * trials.shape[-1]), axis=-1)
+        return trials_resampled, labels, times_new, fs_new
 
 
 def load_ebg4_sniff_mat(path, save_path):
@@ -553,7 +556,6 @@ class MinMaxNormalize:
 
 
 if __name__ == "__main__":
-
     # load_ebg4_sniff_mat("/Volumes/T5 EVO/Smell/ebg4_sniff/trials_all_subjects_ICA_cut.mat",
     #                     "/Volumes/T5 EVO/Smell/ebg4_sniff/ebg4_sniff_subject")
 
