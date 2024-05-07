@@ -162,7 +162,7 @@ def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_l
     fs = None
     for subject in subjects:
         data_subj, labels_subj, time_vec_subj, fs_subj = \
-            load_ebg4(root=root_path, subject_id=subject, data_type=data_type)
+            load_ebg4(root=root_path, subject_id=subject, data_type=data_type, fs_new=None)
         if fs is None:
             fs = float(fs_subj)
 

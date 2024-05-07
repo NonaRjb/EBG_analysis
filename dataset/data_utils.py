@@ -95,11 +95,11 @@ def load_ebg4(root, subject_id, data_type, **kwargs):
     elif data_type == "sensor":
         filename = "preprocessed_data.mat"
         file = os.path.join(root, str(subject_id), filename)
-        data, labels, time, fs = load_sensor_ebg4(file)
+        data, labels, time, fs = load_sensor_ebg4(file, kwargs['fs_new'])
     elif data_type == "sensor_ica":
         filename = "preprocessed_data_ica.mat"
         file = os.path.join(root, str(subject_id), filename)
-        data, labels, time, fs = load_sensor_ica_ebg4(file)
+        data, labels, time, fs = load_sensor_ica_ebg4(file, kwargs['fs_new'])
     elif data_type == "sniff":
         filename = "s" + str("{:02d}".format(subject_id)) + "_sniff.pkl"
         file = os.path.join(root, str(subject_id), filename)
@@ -110,7 +110,7 @@ def load_ebg4(root, subject_id, data_type, **kwargs):
     return data, labels, time, fs
 
 
-def load_sensor_ebg4(filename):
+def load_sensor_ebg4(filename, fs_new=None):
     print(f"********** loading sensor data from {filename} **********")
     data_struct = mat73.loadmat(filename)
     data = np.asarray(data_struct['data_eeg']['trial'])
@@ -120,10 +120,17 @@ def load_sensor_ebg4(filename):
     labels = labels[:, 0]
     fs = 512
 
-    return data, labels, time, fs
+    if fs_new is None:
+        return data, labels, time, fs
+    else:
+        # low-pass filter
+        data_filtered = mne.filter.filter_data(data, sfreq=fs, l_freq=None, h_freq=min(120, fs_new/2))
+        times_new = np.arange(-1., 4., 1 / fs_new)
+        data_resampled = resample(data_filtered, num=int(fs_new / fs * data_filtered.shape[-1]), axis=-1)
+        return data_resampled, labels, times_new, fs_new
 
 
-def load_sensor_ica_ebg4(filename):
+def load_sensor_ica_ebg4(filename, fs_new=None):
     print(f"********** loading sensor data from {filename} **********")
     data_struct = mat73.loadmat(filename)
     data = np.asarray(data_struct['data_eeg_ica']['trial'])
@@ -133,7 +140,14 @@ def load_sensor_ica_ebg4(filename):
     labels = labels[:, 0]
     fs = 512
 
-    return data, labels, time, fs
+    if fs_new is None:
+        return data, labels, time, fs
+    else:
+        # low-pass filter
+        data_filtered = mne.filter.filter_data(data, sfreq=fs, l_freq=None, h_freq=min(120, fs_new/2))
+        times_new = np.arange(-1., 4., 1 / fs_new)
+        data_resampled = resample(data_filtered, num=int(fs_new / fs * data_filtered.shape[-1]), axis=-1)
+        return data_resampled, labels, times_new, fs_new
 
 
 def load_source_ebg4(filename):
@@ -171,12 +185,12 @@ def load_ebg4_sniff(filename, fs_new=None):
 
     # Low-pass filter and downsample TODO
     if fs_new is None:
-        return trials, labels, orig_times, fs_new
+        return trials, labels, orig_times, fs
     else:
         # low-pass filter
         trials_filtered = mne.filter.filter_data(trials, sfreq=fs, l_freq=None, h_freq=50)
         times_new = np.arange(-1., 4., 1 / fs_new)
-        trials_resampled = resample(trials_filtered, num=int(fs_new / fs * trials.shape[-1]), axis=-1)
+        trials_resampled = resample(trials_filtered, num=int(fs_new / fs * trials_filtered.shape[-1]), axis=-1)
         return trials_resampled, labels, times_new, fs_new
 
 
