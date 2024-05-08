@@ -94,6 +94,36 @@ if __name__ == "__main__":
         directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}_w{args.w}"
         os.makedirs(os.path.join(paths['save_path'], directory_name), exist_ok=True)
 
+        constants.data_constants['tmin'] = args.tmin
+        constants.data_constants['tmax'] = args.tmax
+        constants.data_constants['w'] = args.w
+        constants.data_constants['ebg_transform'] = args.ebg_transform
+
+        if constants.data_constants['modality'] == "ebg":
+            for key in constants.model_constants.keys():
+                if "n_channels" in constants.model_constants[key].keys():
+                    constants.model_constants[key]['n_channels'] = 4
+        elif constants.data_constants['modality'] == "eeg":
+            for key in constants.model_constants.keys():
+                if "n_channels" in constants.model_constants[key].keys():
+                    constants.model_constants[key]['n_channels'] = 64
+        elif constants.data_constants['modality'] == "ebg-sniff":
+            for key in constants.model_constants.keys():
+                if "n_channels" in constants.model_constants[key].keys():
+                    constants.model_constants[key]['n_channels'] = 5
+        elif constants.data_constants['modality'] == "eeg-sniff":
+            for key in constants.model_constants.keys():
+                if "n_channels" in constants.model_constants[key].keys():
+                    constants.model_constants[key]['n_channels'] = 65
+        elif constants.data_constants['modality'] == "both-sniff":
+            for key in constants.model_constants.keys():
+                if "n_channels" in constants.model_constants[key].keys():
+                    constants.model_constants[key]['n_channels'] = 69
+        else:
+            for key in constants.model_constants.keys():
+                if "n_channels" in constants.model_constants[key].keys():
+                    constants.model_constants[key]['n_channels'] = 68
+
         for subject_id in subject_ids:
 
             paths = {
@@ -114,11 +144,6 @@ if __name__ == "__main__":
             # os.makedirs(paths["save_path"], exist_ok=True)
             print(f"Directory '{directory_name}' created.")
             # create_readme(wandb.config, path=paths['save_path'])
-
-            constants.data_constants['tmin'] = args.tmin
-            constants.data_constants['tmax'] = args.tmax
-            constants.data_constants['w'] = args.w
-            constants.data_constants['ebg_transform'] = args.ebg_transform
 
             # data, weights, n_time_samples = load_data.load(
             loaders, data, n_time_samples = load_data.load(

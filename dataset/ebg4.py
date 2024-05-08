@@ -17,6 +17,7 @@ class EBG4(Dataset):
             modality: str = 'both',
             intensity: bool = False,
             pick_subjects: int = 0,
+            z_score: bool = False,
             fs_new: int = None
     ):
 
@@ -34,6 +35,7 @@ class EBG4(Dataset):
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2
+        self.z_score = z_score
         self.source_data = None
         self.labels = None
         self.subject_id = None
@@ -153,7 +155,11 @@ class EBG4(Dataset):
     def __getitem__(self, item):
         if torch.is_tensor(item):
             item = item.tolist()
-        sample = torch.from_numpy(self.data[item, ...])
+        sample = self.data[item, ...]
+        if self.z_score:
+            sample = \
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-06)
+        sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 
 
