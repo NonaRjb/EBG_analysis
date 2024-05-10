@@ -5,7 +5,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.pipeline import make_pipeline
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, roc_auc_score, precision_recall_curve, auc
+from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import cross_validate
 from mne.decoding import CSP, UnsupervisedSpatialFilter
 from dataset.data_utils import load_ebg1_mat
@@ -404,10 +405,11 @@ if __name__ == "__main__":
             LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
                                max_iter=2000,
                                random_state=seed))
-
+        dummy_model = DummyClassifier(strategy='stratified')
         skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
 
-        scores = []
+        aucroc_scores = []
+        aucpr_scores = []
         for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
@@ -422,17 +424,27 @@ if __name__ == "__main__":
 
             clf = clf.fit(X_train, y_train)
             prob_scores = clf.predict_proba(X_test)[:, 1]
-            auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-            scores.append(auc_score)
+            precision, recall, _ = precision_recall_curve(y_test, prob_scores)
+            aucpr_score = auc(recall, precision)
+            aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
+            aucroc_scores.append(aucroc_score)
+            aucpr_scores.append(aucpr_score)
+
+            dummy_model.fit(X_train, y_train)
+            dummy_probs = dummy_model.predict_proba(X_test)[:, 1]
+            dummy_precision, dummy_recall, _ = precision_recall_curve(y_test, dummy_probs)
+            dummy_aucpr_score = auc(dummy_recall, dummy_precision)
+
+            print(f"Model AUCPR = {aucpr_score} | Dummy AUCPR = {dummy_aucpr_score}")
 
         if args.save is True:
             print("Saving the AUC Scores")
             os.makedirs(os.path.join(save_path, str(args.subject_id)), exist_ok=True)
             np.save(
                 os.path.join(save_path, str(args.subject_id), f"{c}.npy"),
-                np.asarray(scores)
+                np.asarray(aucroc_scores)
             )
-        plt.boxplot(scores, labels=[str(args.subject_id)])
+        plt.boxplot(aucroc_scores, labels=[str(args.subject_id)])
         plt.axhline(y=0.5, color='r', linestyle='--')
         plt.title(f"AUC Scores Subject {args.subject_id}, C = {c}")
         os.makedirs(os.path.join(save_path, "plots"), exist_ok=True)
