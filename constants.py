@@ -20,6 +20,14 @@ data_constants = {
     'baseline_type': 'zscore'
 }
 
+training_constants = {
+    'scheduler_name': 'plateau',
+    'weight_decay': 0.1,
+    'lr': 0.0001,
+    'batch_size': 16,
+    'optim_name': 'adamw'
+}
+
 if data_constants['fmax'] is not None and data_constants['fmin'] is not None:
     lstm_input_size = np.abs(data_constants['tfr_freqs'] - data_constants['fmax']).argmin() - \
                       np.abs(data_constants['tfr_freqs'] - data_constants['fmin']).argmin() + 1

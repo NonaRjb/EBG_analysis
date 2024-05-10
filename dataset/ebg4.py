@@ -31,7 +31,7 @@ class EBG4(Dataset):
             print("***** Training On All Available Subject *****")
         else:
             subjects = [pick_subjects]
-            print(f"***** Training On Subject {pick_subjects}")
+            print(f"***** Training On Subject {pick_subjects} *****")
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2

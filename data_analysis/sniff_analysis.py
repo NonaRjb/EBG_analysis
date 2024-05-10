@@ -35,7 +35,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "local"
+    loc = "remote"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
