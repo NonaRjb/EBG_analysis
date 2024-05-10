@@ -16,23 +16,34 @@ class EBG4(Dataset):
             data_type: str = 'source',
             modality: str = 'both',
             intensity: bool = False,
-            pick_subjects: int = 0
+            pick_subjects: int = 0,
+            z_score: bool = False,
+            fs_new: int = None
     ):
 
         self.root_path = root_path
         if pick_subjects == 0:
             # if data_type != 'source':
+<<<<<<< HEAD
             #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]    
             # else:
             #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
             # print("***** Training On All Available Subject *****")
             subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+=======
+            #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]
+            # else:
+            #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+            print("***** Training On All Available Subject *****")
+>>>>>>> c04e6734cc56f38549cfe71904c6316ae96cde51
         else:
             subjects = [pick_subjects]
-            print(f"***** Training On Subject {pick_subjects}")
+            print(f"***** Training On Subject {pick_subjects} *****")
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2
+        self.z_score = z_score
         self.source_data = None
         self.labels = None
         self.subject_id = None
@@ -41,7 +52,7 @@ class EBG4(Dataset):
         self.class_weight = None
 
         for i, subject in enumerate(subjects):
-            source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type)
+            source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type, fs_new=fs_new)
 
             if self.fs is None:
                 self.fs = float(fs)
@@ -52,8 +63,37 @@ class EBG4(Dataset):
             if data_type == 'sensor' or data_type == 'sensor_ica':
                 if modality == 'eeg':
                     source_data = source_data[:, :64, :]
+                elif modality == 'eeg-sniff':
+                    sniff_data, _, _, _ = load_ebg4(
+                        root_path,
+                        subject,
+                        data_type="sniff",
+                        fs_new=fs_new if fs_new is not None else self.fs
+                    )
+                    sniff_data = np.expand_dims(sniff_data, axis=1)
+                    source_data = source_data[:, :64, :]    # extract EEG
+                    source_data = np.concatenate((source_data, sniff_data), axis=1)
                 elif modality == 'ebg':
                     source_data = source_data[:, 64:, :]
+                elif modality == 'ebg-sniff':
+                    sniff_data, _, _, _ = load_ebg4(
+                        root_path,
+                        subject,
+                        data_type="sniff",
+                        fs_new=fs_new if fs_new is not None else self.fs
+                    )
+                    sniff_data = np.expand_dims(sniff_data, axis=1)
+                    source_data = source_data[:, 64:, :]    # extract EBG
+                    source_data = np.concatenate((source_data, sniff_data), axis=1)
+                elif modality == 'both-sniff':
+                    sniff_data, _, _, _ = load_ebg4(
+                        root_path,
+                        subject,
+                        data_type="sniff",
+                        fs_new=fs_new if fs_new is not None else self.fs
+                    )
+                    sniff_data = np.expand_dims(sniff_data, axis=1)
+                    source_data = np.concatenate((source_data, sniff_data), axis=1)
                 else:
                     pass
 
@@ -123,7 +163,11 @@ class EBG4(Dataset):
     def __getitem__(self, item):
         if torch.is_tensor(item):
             item = item.tolist()
-        sample = torch.from_numpy(self.data[item, ...])
+        sample = self.data[item, ...]
+        if self.z_score:
+            sample = \
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-06)
+        sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 
 

@@ -6,16 +6,26 @@ data_constants = {
     'w': 0.5,
     'fmin': None,
     'fmax': None,
+    'fs_new': None,
     'binary': True,
     'train_size': 0.8,
     'val_size': 0.2,
     'ebg_transform': None,
+    'z_score': True,
     'shuffle_labels': False,
     'modality': 'ebg',
     'intensity': False,
     'n_classes': 2,
     'tfr_freqs': np.linspace(20, 100, 160),
     'baseline_type': 'zscore'
+}
+
+training_constants = {
+    'scheduler_name': 'plateau',
+    'weight_decay': 0.1,
+    'lr': 0.0001,
+    'batch_size': 16,
+    'optim_name': 'adamw'
 }
 
 if data_constants['fmax'] is not None and data_constants['fmin'] is not None:

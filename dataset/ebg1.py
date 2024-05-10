@@ -17,7 +17,8 @@ class EBG1(Dataset):
             w: float = None,
             binary: bool = True,
             modality: str = 'ebg',
-            pick_subjects: int = 0
+            pick_subjects: int = 0,
+            z_score: bool = False
     ):
 
         self.root_path = root_path
@@ -34,6 +35,7 @@ class EBG1(Dataset):
 
         self.baseline_min = -0.5
         self.baseline_max = -0.2
+        self.z_score = z_score
         self.init_data = None
         self.labels = None
         self.subject_id = None
@@ -117,7 +119,11 @@ class EBG1(Dataset):
     def __getitem__(self, item):
         if torch.is_tensor(item):
             item = item.tolist()
-        sample = torch.from_numpy(self.data[item, ...])
+        sample = self.data[item, ...]
+        if self.z_score:
+            sample = \
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-06)
+        sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 
 

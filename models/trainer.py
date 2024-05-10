@@ -140,16 +140,16 @@ class ModelTrainer:
                 self.y_true_val.append(torch.stack(y_true_val).detach().cpu())
                 self.y_pred_val.append(torch.stack(y_pred_val).detach().cpu())
                 
-                wandb.log({
-                    # "train_acc": train_balanced_acc,
-                    "train_loss": train_loss,
-                    "train_auroc": train_auroc,
-                    # "val_acc": val_balanaced_acc,
-                    "val_loss": val_loss,
-                    "val_auroc": val_auroc,
-                    "lr": learning_rate,
-                    "epoch": epoch
-                })
+                # wandb.log({
+                #     # "train_acc": train_balanced_acc,
+                #     "train_loss": train_loss,
+                #     "train_auroc": train_auroc,
+                #     # "val_acc": val_balanaced_acc,
+                #     "val_loss": val_loss,
+                #     "val_auroc": val_auroc,
+                #     "lr": learning_rate,
+                #     "epoch": epoch
+                # })
                 
 
         print("Finished training.")

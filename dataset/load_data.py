@@ -22,7 +22,7 @@ def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: i
     if dataset_name == 'ebg1':
         path = os.path.join(path, "ebg1")
         data = EBG1(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], w=kwargs['w'], pick_subjects=subject_id,
-                    binary=kwargs['binary'], modality=kwargs['modality'])
+                    binary=kwargs['binary'], modality=kwargs['modality'], z_score=kwargs['z_score'])
     elif dataset_name == 'ebg1_tfr':
         data = EBG1TFR(root_path=path, tmin=kwargs['tmin'], tmax=kwargs['tmax'], fmin=kwargs['fmin'],
                        fmax=kwargs['fmax'], shuffle_labels=kwargs['shuffle_labels'])
@@ -33,17 +33,18 @@ def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: i
     elif dataset_name == 'ebg4_source':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
-                    data_type="source", intensity=kwargs['intensity'], pick_subjects=subject_id)
+                    data_type="source", intensity=kwargs['intensity'], z_score=kwargs['z_score'],
+                    pick_subjects=subject_id)
     elif dataset_name == 'ebg4_sensor':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
                     data_type="sensor", modality=kwargs["modality"], intensity=kwargs['intensity'],
-                    pick_subjects=subject_id)
+                    pick_subjects=subject_id, fs_new=kwargs['fs_new'], z_score=kwargs['z_score'])
     elif dataset_name == 'ebg4_sensor_ica':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
                     data_type="sensor_ica", modality=kwargs["modality"], intensity=kwargs['intensity'],
-                    pick_subjects=subject_id)
+                    pick_subjects=subject_id, fs_new=kwargs['fs_new'], z_score=kwargs['z_score'])
     elif dataset_name == "ebg_all":
         data = EBG_all(root_path=path, tmin=kwargs["tmin"], tmax=kwargs["tmax"], binary=kwargs["binary"],
                        modality=kwargs["modality"])

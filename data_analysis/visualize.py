@@ -81,38 +81,64 @@ def compare_logreg_c_tmin(root_path, w_size, save_path):
 
 
 def compare_logreg_c(root_path, save_path):
-    pattern = r's\d+_c([\d.]+)\.npy'
+    # pattern = r's\d+_c([\d.]+)\.npy'
+    pattern = r'c([\d.]+)\.npy'
 
     subjects = os.listdir(root_path)
+    best_scores = {}
+    medians = []
     for subject in subjects:
 
         scores = {}
-        medians = {}
         for filename in os.listdir(os.path.join(root_path, subject)):
             match = re.match(pattern, filename)
             if match:
                 c = match.group(1)
                 scores[c] = np.load(os.path.join(root_path, subject, filename))
-                medians[c] = np.median(scores[c])
+        best_param_subj, best_median_subj = find_best_param(scores)
+        best_scores[subject] = scores[best_param_subj]
+        print(f"Subject {subject}: maximum auc median = {best_median_subj}, C = {best_param_subj}")
+        medians.append(best_median_subj)
 
         # sort dict
-        c_values = list(scores.keys())
-        c_values.sort()
-        sorted_scores = {i: scores[i] for i in c_values}
-        auc_scores = sorted_scores.values()
+        # c_values = list(scores.keys())
+        # c_values.sort()
+        # sorted_scores = {i: scores[i] for i in c_values}
+        # auc_scores = sorted_scores.values()
+        #
+        # plt.figure(figsize=(15, 6))
+        # plt.boxplot(auc_scores, labels=c_values)
+        # plt.title(f'Boxplot of AUC Scores for Subject {subject}')
+        # plt.xlabel('C Values')
+        # plt.ylabel('AUC Score')
+        # plt.axhline(y=0.5, color='r', linestyle='--')
+        # plt.savefig(os.path.join(save_path, f"s{subject}_c_auc_box_plots.png"))
+        # plt.close()
+        # sort dict
+    auc_keys = list(best_scores.keys())
+    auc_keys = [int(k) for k in auc_keys]
+    auc_keys.sort()
+    sorted_best_scores = {str(k): best_scores[str(k)] for k in auc_keys}
+    auc_scores = sorted_best_scores.values()
 
-        plt.figure(figsize=(15, 6))
-        plt.boxplot(auc_scores, labels=c_values)
-        plt.title(f'Boxplot of AUC Scores for Subject {subject}')
-        plt.xlabel('C Values')
-        plt.ylabel('AUC Score')
-        plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.savefig(os.path.join(save_path, subject, f"c_auc_box_plots.png"))
-        plt.close()
-        print(f"\n*********** Subject {subject} ************\n")
-        print(medians)
-        max_key = max(medians, key=lambda k: medians[k])
-        print(f"maximum auc median: {medians[max_key]}, C = {max_key}")
+    plt.figure(figsize=(20, 6))
+    plt.boxplot(auc_scores, labels=auc_keys)
+    plt.title(f'Boxplot of Best AUC Scores for All Subjects')
+    plt.xlabel('Subject ID')
+    plt.ylabel('AUC Score')
+    plt.axhline(y=0.5, color='r', linestyle='--')
+    plt.savefig(os.path.join(save_path, f"auc_box_plots_logreg_c.png"))
+    plt.close()
+
+    plt.boxplot(medians, labels=["Logistic Regression"])
+    plt.axhline(y=0.5, color='r', linestyle='--')
+    plt.title(f'Boxplot of Best AUC Scores for All Subjects')
+    plt.xlabel('Model')
+    plt.ylabel('AUC Score')
+    plt.savefig(os.path.join(save_path, f"box_plot_logreg_single_plot.png"))
+    plt.close()
+
+    print(f"Median of Best Medians is: {np.median(medians)}")
 
     return
 
@@ -233,10 +259,14 @@ def plot_dnn_res(root_path, save_path):
 
 def plot_dnn_win_res(root_path, w_size, save_path):
     # root_path = os.path.join(root_path, "ebg4_sensor_ica_eegnet1d_ebg_w" + str(w_size))
-    root_path = os.path.join(root_path, "ebg1_eegnet1d_ebg_w" + str(w_size))
-    # subjects = [i for i in range(1, 26) if i != 10]
+    root_path = os.path.join(root_path, "ebg4_source_eegnet1d_ebg_w" + str(w_size))
+    # root_path = os.path.join(root_path, "ebg1_eegnet1d_ebg_w" + str(w_size))
+
+    os.makedirs(os.path.join(save_path, "w" + str(w_size)), exist_ok=True)
+
+    subjects = [i for i in range(1, 26) if i != 10]
     # subjects = [0]
-    subjects = [i for i in range(1, 31) if i != 4]
+    # subjects = [i for i in range(1, 31) if i != 4]
     auc_dict = {}
     epoch_dict = {}
     best_medians_subj = {}
@@ -280,6 +310,15 @@ def plot_dnn_win_res(root_path, w_size, save_path):
         best_medians_all.append(best_performance)
         best_tmins.append(float(best_param))
 
+        # plt.boxplot(auc_sorted[best_param], labels=["EEGNet1D"])
+        # plt.title('Boxplot of Best AUC Scores for All Subjects')
+        # plt.xlabel("Model")
+        # plt.ylabel("AUC Score")
+        # plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_eegnet1d_combined_subjects.png"))
+        # plt.close()
+        #
+        # print(f"Best AUC Score: {np.median(auc_sorted[best_param])}")
+
     auc_scores = best_medians_subj.values()
     auc_keys = best_medians_subj.keys()
     plt.figure(figsize=(15, 6))
@@ -319,8 +358,10 @@ def plot_dnn_win_res(root_path, w_size, save_path):
 def compare_models(save_path):
     ebg4_eegnet1d_path = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/w0.5/"
     ebg1_eegnet1d_path = "/Volumes/T5 EVO/Smell/plots/ebg1_dnn/w_results/w0.5/"
-    ebg4_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg4/w0.1/"
-    ebg1_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1/w0.1/"
+    ebg4_100_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg4/w0.1/"
+    ebg1_100_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1/w0.1/"
+    ebg4_500_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg4/w0.5/"
+    ebg1_500_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1/w0.5/"
 
     # aucs = {
     #     'EEGNet1D': np.load(os.path.join(eegnet1d_path, "eegnet1d_w0.5.npy")),
@@ -350,12 +391,14 @@ def compare_models(save_path):
     # Generate some random data for demonstration
     data_model1_dataset1 = np.load(os.path.join(ebg1_eegnet1d_path, "eegnet1d_w0.5.npy"))
     data_model1_dataset2 = np.load(os.path.join(ebg4_eegnet1d_path, "eegnet1d_w0.5.npy"))
-    data_model2_dataset1 = np.load(os.path.join(ebg1_logreg_path, "logreg_w0.1.npy"))
-    data_model2_dataset2 = np.load(os.path.join(ebg4_logreg_path, "logreg_w0.1.npy"))
+    data_model2_dataset1 = np.load(os.path.join(ebg1_100_logreg_path, "logreg_w0.1.npy"))
+    data_model2_dataset2 = np.load(os.path.join(ebg4_100_logreg_path, "logreg_w0.1.npy"))
+    data_model2_dataset1_2 = np.load(os.path.join(ebg1_500_logreg_path, "logreg_w0.5.npy"))
+    data_model2_dataset2_2 = np.load(os.path.join(ebg4_500_logreg_path, "logreg_w0.5.npy"))
 
     # Create positions for the boxplots
-    positions_dataset1 = np.array([1, 2])
-    positions_dataset2 = np.array([4, 5])
+    positions_dataset1 = np.array([1, 2, 3])
+    positions_dataset2 = np.array([5, 6, 7])
 
     # Plot boxplots with different colors
     plt.boxplot([data_model1_dataset1, data_model1_dataset2],
@@ -378,8 +421,19 @@ def compare_models(save_path):
                 medianprops=dict(color="black"),  # color of median
                 flierprops=dict(marker="o", markersize=5, markerfacecolor="#7C1D6F"))  # color of outliers
 
-    dataset1_patch = mpatches.Patch(color='#F0746E', label='EEGNet-1D')
-    dataset2_patch = mpatches.Patch(color='#7CCBA2', label='LogReg')
+    plt.boxplot([data_model2_dataset1_2, data_model2_dataset2_2],
+                positions=[positions_dataset1[2], positions_dataset2[2]],
+                patch_artist=True,  # fill with color
+                notch=False,  # notch shape
+                boxprops=dict(facecolor="#089099"),  # color of the box
+                whiskerprops=dict(color="black"),  # color of whiskers
+                capprops=dict(color="black"),  # color of caps
+                medianprops=dict(color="black"),  # color of median
+                flierprops=dict(marker="o", markersize=5, markerfacecolor="#7C1D6F"))  # color of outliers
+
+    model1_patch = mpatches.Patch(color='#F0746E', label='EEGNet-1D')
+    model2_patch = mpatches.Patch(color='#7CCBA2', label='LogReg-100ms')
+    model2_2_patch = mpatches.Patch(color='#089099', label='LogReg-500ms')
 
     # Set labels for x-axis
     plt.xticks([positions_dataset1.mean(), positions_dataset2.mean()], ['Dataset 1', 'Dataset 2'])
@@ -390,17 +444,19 @@ def compare_models(save_path):
     plt.ylabel('Performance')
 
     # Add legend
-    plt.legend(handles=[dataset1_patch, dataset2_patch])
+    plt.legend(handles=[model1_patch, model2_patch, model2_2_patch])
     plt.grid(axis='y', color='0.92')
-    plt.savefig(os.path.join(save_path, f"box_plot_compare_models.png"))
+    plt.savefig(os.path.join(save_path, f"box_plot_compare_models_all.png"))
     plt.close()
     # Show the plot
     # plt.show()
 
     data_model1_dataset1 = np.load(os.path.join(ebg1_eegnet1d_path, "eegnet1d_t_w0.5.npy"))
     data_model1_dataset2 = np.load(os.path.join(ebg4_eegnet1d_path, "eegnet1d_t_w0.5.npy"))
-    data_model2_dataset1 = np.load(os.path.join(ebg1_logreg_path, "logreg_t_w0.1.npy"))
-    data_model2_dataset2 = np.load(os.path.join(ebg4_logreg_path, "logreg_t_w0.1.npy"))
+    data_model2_dataset1 = np.load(os.path.join(ebg1_100_logreg_path, "logreg_t_w0.1.npy"))
+    data_model2_dataset2 = np.load(os.path.join(ebg4_100_logreg_path, "logreg_t_w0.1.npy"))
+    data_model2_dataset1_2 = np.load(os.path.join(ebg1_500_logreg_path, "logreg_t_w0.5.npy"))
+    data_model2_dataset2_2 = np.load(os.path.join(ebg4_500_logreg_path, "logreg_t_w0.5.npy"))
 
     # Plot boxplots with different colors
     plt.boxplot([data_model1_dataset1, data_model1_dataset2],
@@ -423,8 +479,19 @@ def compare_models(save_path):
                 medianprops=dict(color="black"),  # color of median
                 flierprops=dict(marker="o", markersize=5, markerfacecolor="#7C1D6F"))  # color of outliers
 
-    dataset1_patch = mpatches.Patch(color='#F0746E', label='EEGNet-1D')
-    dataset2_patch = mpatches.Patch(color='#7CCBA2', label='LogReg')
+    plt.boxplot([data_model2_dataset1_2, data_model2_dataset2_2],
+                positions=[positions_dataset1[2], positions_dataset2[2]],
+                patch_artist=True,  # fill with color
+                notch=False,  # notch shape
+                boxprops=dict(facecolor="#089099"),  # color of the box
+                whiskerprops=dict(color="black"),  # color of whiskers
+                capprops=dict(color="black"),  # color of caps
+                medianprops=dict(color="black"),  # color of median
+                flierprops=dict(marker="o", markersize=5, markerfacecolor="#7C1D6F"))  # color of outliers
+
+    model1_patch = mpatches.Patch(color='#F0746E', label='EEGNet-1D')
+    model2_patch = mpatches.Patch(color='#7CCBA2', label='LogReg-100ms')
+    model2_2_patch = mpatches.Patch(color='#089099', label='LogReg-500ms')
 
     # Set labels for x-axis
     plt.xticks([positions_dataset1.mean(), positions_dataset2.mean()], ['Dataset 1', 'Dataset 2'])
@@ -435,14 +502,14 @@ def compare_models(save_path):
     plt.ylabel('T-Start')
 
     # Add legend
-    plt.legend(handles=[dataset1_patch, dataset2_patch])
+    plt.legend(handles=[model1_patch, model2_patch, model2_2_patch])
     plt.grid(axis='y', color='0.92')
-    plt.savefig(os.path.join(save_path, f"box_plot_compare_models_tmin.png"))
+    plt.savefig(os.path.join(save_path, f"box_plot_compare_models_tmin_all.png"))
     plt.close()
 
 
 if __name__ == "__main__":
-    task = "compare_models"
+    task = "compare_logreg_c_sniff"
 
     if task == "compare_logreg_c":
         path_to_data = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/grid_search_c"
@@ -457,13 +524,18 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell"
         plot_dnn_res(path_to_data, path_to_save)
     elif task == "plot_dnn_win_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg1_dnn/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg1_dnn/w_results/"
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
         plot_dnn_win_res(path_to_data, 0.5, path_to_save)
     elif task == "compare_models":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/compare_models"
         compare_models(path_to_save)
     elif task == "compare_logreg_c_tmin":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/ebg4"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg4"
-        compare_logreg_c_tmin(path_to_data, 0.1, path_to_save)
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/grid_search_c_tmin/ebg1"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1"
+        compare_logreg_c_tmin(path_to_data, 0.5, path_to_save)
+    elif task == "compare_logreg_c_sniff":
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/sniff/grid_search_c"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/sniff/grid_search_c_plots"
+        compare_logreg_c(path_to_data, path_to_save)
+
