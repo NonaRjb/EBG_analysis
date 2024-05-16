@@ -212,6 +212,10 @@ def main():
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 69
+    elif constants.data_constants['modality'] == 'sniff':
+        for key in constants.model_constants.keys():
+            if "n_channels" in constants.model_constants[key].keys():
+                constants.model_constants[key]['n_channels'] = 1
     else:
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
