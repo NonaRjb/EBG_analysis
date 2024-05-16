@@ -5,39 +5,15 @@ metric:
   name: val_auroc
 parameters:
   data:
-    value: ebg4_sensor_ica
+    value: ebg1
   subject_id:
-    values:
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
-      - 8
-      - 9
-      - 11
-      - 12
-      - 13
-      - 14 
-      - 15
-      - 16
-      - 17
-      - 18
-      - 19
-      - 20
-      - 21
-      - 22
-      - 23
-      - 24
-      - 25
+    value: -1
   ebg_transform:
     value: tfr_morlet
   eeg:
     value: eegnet1d
   batch_size:
-    value: 32
+    value: 16
   lr:
     value: 0.0001
   lr_scheduler:

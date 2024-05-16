@@ -86,6 +86,15 @@ class EBG4(Dataset):
                     )
                     sniff_data = np.expand_dims(sniff_data, axis=1)
                     source_data = np.concatenate((source_data, sniff_data), axis=1)
+                elif modality == 'sniff':
+                    sniff_data, _, _, _ = load_ebg4(
+                        root_path,
+                        subject,
+                        data_type="sniff",
+                        fs_new=fs_new if fs_new is not None else self.fs
+                    )
+                    sniff_data = np.expand_dims(sniff_data, axis=1)
+                    source_data = sniff_data
                 else:
                     pass
 
@@ -158,7 +167,7 @@ class EBG4(Dataset):
         sample = self.data[item, ...]
         if self.z_score:
             sample = \
-                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-06)
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
         sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 

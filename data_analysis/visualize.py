@@ -3,12 +3,18 @@ import pickle
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+from scipy import stats
 import os
 import re
 
 
-def compare_logreg_c_tmin(root_path, w_size, save_path):
+colors = {
+        "eeg": '#DDCC77',
+        "ebg": '#CC6677',
+        "sniff": '#44AA99'
+    }
 
+def compare_logreg_c_tmin(root_path, w_size, save_path):
     os.makedirs(os.path.join(save_path, "w" + str(w_size)), exist_ok=True)
 
     pattern = r"c(\d+(\.\d+)?)_t(-?\d+(\.\d+)?)\.npy"
@@ -22,7 +28,6 @@ def compare_logreg_c_tmin(root_path, w_size, save_path):
 
         scores = {}
         for filename in os.listdir(os.path.join(root_path, subject)):
-
             scores[filename] = np.load(os.path.join(root_path, subject, filename))
 
         best_param_subj, best_median_subj = find_best_param(scores)
@@ -80,13 +85,15 @@ def compare_logreg_c_tmin(root_path, w_size, save_path):
     return
 
 
-def compare_logreg_c(root_path, save_path):
-    # pattern = r's\d+_c([\d.]+)\.npy'
-    pattern = r'c([\d.]+)\.npy'
+def compare_logreg_c(root_path, save_path, modality):
+    if modality == "sniff":
+        pattern = r'c([\d.]+)\.npy'
+    else:
+        pattern = r'([\d.]+)\.npy'
 
     subjects = os.listdir(root_path)
     best_scores = {}
-    medians = []
+    best_metric = []
     for subject in subjects:
 
         scores = {}
@@ -95,50 +102,48 @@ def compare_logreg_c(root_path, save_path):
             if match:
                 c = match.group(1)
                 scores[c] = np.load(os.path.join(root_path, subject, filename))
-        best_param_subj, best_median_subj = find_best_param(scores)
+                scores[c] = [i for i in scores[c] if i != 0]
+        best_param_subj, best_metric_subj = find_best_param(scores, metric="mean")
         best_scores[subject] = scores[best_param_subj]
-        print(f"Subject {subject}: maximum auc median = {best_median_subj}, C = {best_param_subj}")
-        medians.append(best_median_subj)
+        print(f"Subject {subject}: maximum auc median = {best_metric_subj}, C = {best_param_subj}")
+        best_metric.append(best_metric_subj)
 
-        # sort dict
-        # c_values = list(scores.keys())
-        # c_values.sort()
-        # sorted_scores = {i: scores[i] for i in c_values}
-        # auc_scores = sorted_scores.values()
-        #
-        # plt.figure(figsize=(15, 6))
-        # plt.boxplot(auc_scores, labels=c_values)
-        # plt.title(f'Boxplot of AUC Scores for Subject {subject}')
-        # plt.xlabel('C Values')
-        # plt.ylabel('AUC Score')
-        # plt.axhline(y=0.5, color='r', linestyle='--')
-        # plt.savefig(os.path.join(save_path, f"s{subject}_c_auc_box_plots.png"))
-        # plt.close()
-        # sort dict
-    auc_keys = list(best_scores.keys())
-    auc_keys = [int(k) for k in auc_keys]
-    auc_keys.sort()
-    sorted_best_scores = {str(k): best_scores[str(k)] for k in auc_keys}
-    auc_scores = sorted_best_scores.values()
+    with open(os.path.join(save_path, f"scores_subject_{modality}.pkl"), 'wb') as f:
+        pickle.dump(best_scores, f)
+    # Calculate mean performance and standard deviation for each subject
+    mean_performances = {subject: np.mean(performances) for subject, performances in best_scores.items()}
+    std_performances = {subject: np.std(performances) for subject, performances in best_scores.items()}
 
-    plt.figure(figsize=(20, 6))
-    plt.boxplot(auc_scores, labels=auc_keys)
-    plt.title(f'Boxplot of Best AUC Scores for All Subjects')
-    plt.xlabel('Subject ID')
-    plt.ylabel('AUC Score')
-    plt.axhline(y=0.5, color='r', linestyle='--')
-    plt.savefig(os.path.join(save_path, f"auc_box_plots_logreg_c.png"))
+    # Sort subjects based on mean performance
+    sorted_subjects = sorted(mean_performances, key=mean_performances.get)
+    sorted_mean_performances = [mean_performances[subject] for subject in sorted_subjects]
+    sorted_std_performances = [std_performances[subject] for subject in sorted_subjects]
+
+    # Plotting
+    fig, ax = plt.subplots(figsize=(10, 10))  # Adjust size as needed
+    y = np.arange(len(best_scores))
+    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color=colors[modality])
+    ax.axvline(x=0.5, color='red', linestyle='--')
+    ax.set_yticks(y)
+    ax.set_yticklabels(sorted_subjects)
+    ax.set_xlabel('AUC-ROC')
+    plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'])
+    ax.set_title(f'Sorted Average Performance by Subject ({modality.capitalize()})')
+    plt.tight_layout()  # Adjust layout to prevent clipping of labels
+    plt.savefig(os.path.join(save_path, f"auc_bar_plots_logreg_c_{modality}.pdf"))
     plt.close()
 
-    plt.boxplot(medians, labels=["Logistic Regression"])
+    plt.boxplot(best_metric, labels=["Logistic Regression"])
     plt.axhline(y=0.5, color='r', linestyle='--')
     plt.title(f'Boxplot of Best AUC Scores for All Subjects')
     plt.xlabel('Model')
     plt.ylabel('AUC Score')
-    plt.savefig(os.path.join(save_path, f"box_plot_logreg_single_plot.png"))
+    plt.savefig(os.path.join(save_path, f"box_plot_logreg_single_plot_{modality}.png"))
     plt.close()
 
-    print(f"Median of Best Medians is: {np.median(medians)}")
+    print(f"Median of Best Average is: {np.median(best_metric)}")
+
+    np.save(os.path.join(save_path, f"logreg_ebg4_whole_{modality}.npy"), sorted_mean_performances)
 
     return
 
@@ -217,44 +222,75 @@ def load_dnn_subj_results(root_path):
     return aucs, epochs
 
 
-def find_best_param(data_dict):
-    performance_dict = {i: np.median(data_dict[i]) for i in data_dict.keys()}
+def find_best_param(data_dict, metric="median"):
+    if metric == "median":
+        performance_dict = {i: np.median(data_dict[i]) for i in data_dict.keys()}
+    elif metric == "mean":
+        performance_dict = {i: np.mean(data_dict[i]) for i in data_dict.keys()}
+    else:
+        raise NotImplementedError
     best_param = max(performance_dict, key=lambda x: performance_dict[x])
     return best_param, performance_dict[best_param]
 
 
 def plot_dnn_res(root_path, save_path):
-    subjects = [i for i in range(1, 26) if i != 10]
+    subjects = [i for i in range(1, 54) if i != 10]
     aucs = {}
     epochs = {}
+    metrics = []
     for subject in subjects:
         path = os.path.join(root_path, str(subject))
         aucs[str(subject)], epochs[str(subject)] = load_dnn_subj_results(path)
+        zero_idx = [i for i in range(len(aucs[str(subject)])) if aucs[str(subject)][i] == 0]
+        aucs[str(subject)] = [auc for auc in aucs[str(subject)] if auc != 0]
+        epochs[str(subject)] = [e for i, e in enumerate(epochs[str(subject)]) if i not in zero_idx]
+        metrics.append(np.mean(aucs[str(subject)]))
 
-    auc_values = aucs.values()
-    auc_keys = aucs.keys()
-    plt.figure(figsize=(40, 6))
-    plt.boxplot(auc_values, labels=auc_keys)
-    plt.grid(axis='y', color='0.97')
-    plt.title('Boxplot of AUC Scores for Each Subject')
-    plt.xlabel('Subject ID')
-    plt.ylabel('AUC Score')
-    plt.axhline(y=0.5, color='r', linestyle='--')
-    plt.savefig(
-        os.path.join(save_path, "plots", "ebg4_dnn", f"auc_box_plot_eegnet1d.png"))
+    # Calculate mean performance and standard deviation for each subject
+    mean_performances = {subject: np.mean(performances) for subject, performances in aucs.items()}
+    std_performances = {subject: np.std(performances) for subject, performances in aucs.items()}
+
+    # Sort subjects based on mean performance
+    sorted_subjects = sorted(mean_performances, key=mean_performances.get)
+    sorted_mean_performances = [mean_performances[subject] for subject in sorted_subjects]
+    sorted_std_performances = [std_performances[subject] for subject in sorted_subjects]
+
+    # Plotting
+    fig, ax = plt.subplots(figsize=(10, 10))  # Adjust size as needed
+    y = np.arange(len(aucs))
+    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color='#DDCC77')
+    ax.axvline(x=0.5, color='red', linestyle='--')
+    ax.set_yticks(y)
+    ax.set_yticklabels(sorted_subjects)
+    ax.set_xlabel('AUC-ROC')
+    plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'])
+    ax.set_title('Sorted Average Performance by Subject (EBG)')
+    plt.tight_layout()  # Adjust layout to prevent clipping of labels
+    plt.savefig(os.path.join(save_path, f"auc_bar_plots_eegnet1d_c_eeg.pdf"))
+    plt.close()
 
     epoch_vals = epochs.values()
     epoch_keys = epochs.keys()
     plt.figure(figsize=(40, 6))
     plt.boxplot(epoch_vals, labels=epoch_keys)
-    plt.grid(axis='y', color='0.97')
+    plt.grid(axis='y', color='0.95')
     plt.title('Boxplot of Epochs with Best AUC Score for Each Subject')
     plt.xlabel('Subject ID')
     plt.ylabel('Epoch')
     plt.savefig(
-        os.path.join(save_path, "plots", "ebg4_dnn", f"epoch_box_plot_eegnet1d.png"))
+        os.path.join(save_path, f"epoch_box_plot_eegnet1d_eeg.png"))
 
-    plt.show()
+    plt.figure()
+    plt.boxplot(metrics, labels=['EEGNet-1D'])
+    plt.grid(axis='y', color='0.95')
+    plt.title('Boxplot of AUC Scores for EEGNet-1D with Normalized EBG')
+    plt.xlabel('Model')
+    plt.ylabel('AUC Score')
+    plt.axhline(y=0.5, color='r', linestyle='--')
+    plt.savefig(
+        os.path.join(save_path, f"auc_box_plot_eegnet1d_eeg_all.png"))
+    print(f"median of best performances: {np.median(metrics)}")
+    np.save(os.path.join(save_path, f"eegnet1d_ebg4_whole_eeg.npy"), metrics)
 
 
 def plot_dnn_win_res(root_path, w_size, save_path):
@@ -508,20 +544,113 @@ def compare_models(save_path):
     plt.close()
 
 
+def compare_logreg_models(save_path):
+    ebg_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_12features_plots/" \
+               "logreg_ebg4_whole_ebg.npy"
+    eeg_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.5_1.5_12features_plots/" \
+               "logreg_ebg4_whole_eeg.npy"
+    sniff_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/logreg_ebg4_whole_sniff.npy"
+
+    EBG_data = np.load(ebg_path)
+    EEG_data = np.load(eeg_path)
+    sniff_data = np.load(sniff_path)
+    # Calculate mean and standard deviation for each data modality
+    EBG_mean = np.mean(EBG_data)
+    EEG_mean = np.mean(EEG_data)
+    sniff_mean = np.mean(sniff_data)
+
+    EBG_std = np.std(EBG_data)/np.sqrt(len(EBG_data))
+    EEG_std = np.std(EEG_data)/np.sqrt(len(EEG_data))
+    sniff_std = np.std(sniff_data)/np.sqrt(len(sniff_data))
+
+    # Plotting
+    labels = ['EBG', 'EEG', 'Sniff']
+    means = [EBG_mean, EEG_mean, sniff_mean]
+    stds = [EBG_std, EEG_std, sniff_std]
+    colors_ = [colors['ebg'], colors['eeg'], colors['sniff']]
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+    bars = ax.bar(labels, means, yerr=stds, capsize=5, color=colors_, width=0.5)
+
+    ax.set_ylabel('Average AUC Score')
+    ax.set_title('Average AUC Scores Over Subjects')
+    ax.set_ylim(0, max(means) * 1.2)  # Adjust y-axis limit for better visualization
+
+    # Add value labels on top of bars
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(f'{height:.2f}',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(12, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+
+    plt.savefig(os.path.join(save_path, "compare_logreg_whole.pdf"))
+    plt.show()
+
+
+def compare_subjects(ebg_file, eeg_file, sniff_file, save_path):
+
+    # Load data from pickle file
+    with open(ebg_file, 'rb') as file:
+        EBG_data = pickle.load(file)
+    with open(eeg_file, 'rb') as file:
+        EEG_data = pickle.load(file)
+    with open(sniff_file, 'rb') as file:
+        sniff_data = pickle.load(file)
+
+    # Sort subjects and extract performances for each data channel
+    subjects = [int(k) for k in EBG_data.keys()]
+    sorted_subjects = sorted(subjects)
+    EBG_data = {str(subject): EBG_data[str(subject)] for subject in sorted_subjects}
+    EEG_data = {str(subject): EEG_data[str(subject)] for subject in sorted_subjects}
+    sniff_data = {str(subject): sniff_data[str(subject)] for subject in sorted_subjects}
+
+    # Calculate mean and standard deviation for each data channel across subjects
+    EBG_mean = np.array([np.mean(EBG_data[subject]) for subject in EBG_data.keys()])
+    EBG_std = np.array([np.std(EBG_data[subject])/np.sqrt(len(EBG_data[subject])) for subject in EBG_data.keys()])
+
+    EEG_mean = np.array([np.mean(EEG_data[subject]) for subject in EEG_data.keys()])
+    EEG_std = np.array([np.std(EEG_data[subject])/np.sqrt(len(EEG_data[subject])) for subject in EEG_data.keys()])
+
+    sniff_mean = np.array([np.mean(sniff_data[subject]) for subject in sniff_data.keys()])
+    sniff_std = np.array([np.std(sniff_data[subject])/np.sqrt(len(sniff_data[subject])) for subject in sniff_data.keys()])
+
+    # Plotting
+    x = np.arange(len(sorted_subjects))*1.5
+    width = 0.3  # Width of the bars
+
+    fig, ax = plt.subplots(figsize=(25, 8))
+    bars1 = ax.bar(x - width, EBG_mean, yerr=EBG_std, capsize=5, width=width, label='EBG', color=colors['ebg'])
+    bars2 = ax.bar(x, EEG_mean, yerr=EEG_std, capsize=5, width=width, label='EEG', color=colors['eeg'])
+    bars3 = ax.bar(x + width, sniff_mean, yerr=sniff_std, capsize=5, width=width, label='Sniff', color=colors['sniff'])
+    ax.axhline(y=0.5, color='gray', linestyle='--', label='Chance')
+
+    ax.set_ylabel('Mean Performance')
+    ax.set_title('Mean Performance Comparison by Data Channel')
+    ax.set_xticks(x)
+    ax.set_xticklabels(sorted_subjects, rotation=90)
+    ax.legend()
+    # plt.tight_layout()
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    plt.savefig(os.path.join(save_path, f"compare_subjects_whole_logreg.pdf"))
+    plt.show()
+
+
 if __name__ == "__main__":
-    task = "compare_logreg_c_sniff"
+    task = "compare_logreg_models"
 
     if task == "compare_logreg_c":
-        path_to_data = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/grid_search_c"
-        path_to_save = "/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/ebg4_auc_box_plot"
-        compare_logreg_c(path_to_data, path_to_save)
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "sniff")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_ebg"
-        path_to_save = "/Volumes/T5 EVO/Smell"
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg_plots/"
         plot_dnn_res(path_to_data, path_to_save)
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
@@ -535,7 +664,18 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1"
         compare_logreg_c_tmin(path_to_data, 0.5, path_to_save)
     elif task == "compare_logreg_c_sniff":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/sniff/grid_search_c"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/sniff/grid_search_c_plots"
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots"
         compare_logreg_c(path_to_data, path_to_save)
+    elif task == "compare_logreg_models":
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/"
+        compare_logreg_models(path_to_save)
+    elif task == "compare_subjects":
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.5_1.5_12features_plots/" \
+                      "scores_subject_eeg.pkl"
+        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_12features_plots/" \
+                      "scores_subject_ebg.pkl"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/scores_subject_sniff.pkl"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg"
+        compare_subjects(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save)
 

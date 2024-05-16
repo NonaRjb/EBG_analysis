@@ -17,10 +17,10 @@ import models.load_model as load_model
 
 os.environ["WANDB_API_KEY"] = "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 os.environ['WANDB_START_METHOD'] = 'thread'
-# cluster_data_path = '/local_storage/datasets/nonar/ebg/'
-# cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
-cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
+cluster_data_path = '/local_storage/datasets/nonar/ebg/'
+cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
+# cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+# cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
 
@@ -212,6 +212,10 @@ def main():
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 69
+    elif constants.data_constants['modality'] == 'sniff':
+        for key in constants.model_constants.keys():
+            if "n_channels" in constants.model_constants[key].keys():
+                constants.model_constants[key]['n_channels'] = 1
     else:
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
@@ -235,10 +239,12 @@ def main():
     subject_data_list = [(sid, eeg_enc_name, dataset_name, epochs, seed, split_seed, directory_name, device, constants) for sid in subject_ids] 
     print("number of available CPUs = ", os.cpu_count())
     # num_processes = max(os.cpu_count(), 2)
-    num_processes = 10
-    with Pool(processes=num_processes) as pool:
-        # pool.map_async(dummy_function, [1])
-        pool.map(train_subject, subject_data_list)
+    # num_processes = 4
+    # with Pool(processes=num_processes) as pool:
+    #     # pool.map_async(dummy_function, [1])
+    #     pool.map(train_subject, subject_data_list)
+    for x in subject_data_list:
+        train_subject(x)
 
     wandb.finish()
 
