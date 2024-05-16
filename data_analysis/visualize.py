@@ -7,12 +7,12 @@ from scipy import stats
 import os
 import re
 
-
 colors = {
-        "eeg": '#DDCC77',
-        "ebg": '#CC6677',
-        "sniff": '#44AA99'
-    }
+    "eeg": '#DDCC77',
+    "ebg": '#CC6677',
+    "sniff": '#44AA99'
+}
+
 
 def compare_logreg_c_tmin(root_path, w_size, save_path):
     os.makedirs(os.path.join(save_path, "w" + str(w_size)), exist_ok=True)
@@ -233,11 +233,12 @@ def find_best_param(data_dict, metric="median"):
     return best_param, performance_dict[best_param]
 
 
-def plot_dnn_res(root_path, save_path):
+def plot_dnn_res(root_path, save_path, modality):
     subjects = [i for i in range(1, 54) if i != 10]
     aucs = {}
     epochs = {}
     metrics = []
+    scores = {}
     for subject in subjects:
         path = os.path.join(root_path, str(subject))
         aucs[str(subject)], epochs[str(subject)] = load_dnn_subj_results(path)
@@ -245,6 +246,10 @@ def plot_dnn_res(root_path, save_path):
         aucs[str(subject)] = [auc for auc in aucs[str(subject)] if auc != 0]
         epochs[str(subject)] = [e for i, e in enumerate(epochs[str(subject)]) if i not in zero_idx]
         metrics.append(np.mean(aucs[str(subject)]))
+        scores[str(subject)] = aucs[str(subject)]
+
+    with open(os.path.join(save_path, f"scores_subjects_eegnet1d_{modality}.pkl"), 'wb') as f:
+        pickle.dump(scores, f)
 
     # Calculate mean performance and standard deviation for each subject
     mean_performances = {subject: np.mean(performances) for subject, performances in aucs.items()}
@@ -258,7 +263,7 @@ def plot_dnn_res(root_path, save_path):
     # Plotting
     fig, ax = plt.subplots(figsize=(10, 10))  # Adjust size as needed
     y = np.arange(len(aucs))
-    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color='#DDCC77')
+    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color=colors[modality])
     ax.axvline(x=0.5, color='red', linestyle='--')
     ax.set_yticks(y)
     ax.set_yticklabels(sorted_subjects)
@@ -266,7 +271,7 @@ def plot_dnn_res(root_path, save_path):
     plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'])
     ax.set_title('Sorted Average Performance by Subject (EBG)')
     plt.tight_layout()  # Adjust layout to prevent clipping of labels
-    plt.savefig(os.path.join(save_path, f"auc_bar_plots_eegnet1d_c_eeg.pdf"))
+    plt.savefig(os.path.join(save_path, f"auc_bar_plots_eegnet1d_c_{modality}.pdf"))
     plt.close()
 
     epoch_vals = epochs.values()
@@ -278,7 +283,7 @@ def plot_dnn_res(root_path, save_path):
     plt.xlabel('Subject ID')
     plt.ylabel('Epoch')
     plt.savefig(
-        os.path.join(save_path, f"epoch_box_plot_eegnet1d_eeg.png"))
+        os.path.join(save_path, f"epoch_box_plot_eegnet1d_{modality}.png"))
 
     plt.figure()
     plt.boxplot(metrics, labels=['EEGNet-1D'])
@@ -288,9 +293,9 @@ def plot_dnn_res(root_path, save_path):
     plt.ylabel('AUC Score')
     plt.axhline(y=0.5, color='r', linestyle='--')
     plt.savefig(
-        os.path.join(save_path, f"auc_box_plot_eegnet1d_eeg_all.png"))
+        os.path.join(save_path, f"auc_box_plot_eegnet1d_{modality}_all.png"))
     print(f"median of best performances: {np.median(metrics)}")
-    np.save(os.path.join(save_path, f"eegnet1d_ebg4_whole_eeg.npy"), metrics)
+    np.save(os.path.join(save_path, f"eegnet1d_ebg4_whole_{modality}.npy"), metrics)
 
 
 def plot_dnn_win_res(root_path, w_size, save_path):
@@ -398,31 +403,6 @@ def compare_models(save_path):
     ebg1_100_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1/w0.1/"
     ebg4_500_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg4/w0.5/"
     ebg1_500_logreg_path = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1/w0.5/"
-
-    # aucs = {
-    #     'EEGNet1D': np.load(os.path.join(eegnet1d_path, "eegnet1d_w0.5.npy")),
-    #     'LogReg': np.load(os.path.join(logreg_path, "logreg_w0.1.npy"))
-    # }
-    #
-    # tmins = {
-    #     'EEGNet1D': np.load(os.path.join(eegnet1d_path, "eegnet1d_t_w0.5.npy")),
-    #     'LogReg': np.load(os.path.join(logreg_path, "logreg_t_w0.1.npy"))
-    # }
-    #
-    # plt.boxplot(aucs.values(), labels=aucs.keys())
-    # plt.axhline(y=0.5, color='r', linestyle='--')
-    # plt.title(f'Compare Best AUC Scores for Each Model')
-    # plt.xlabel('Model')
-    # plt.ylabel('AUC Score')
-    # plt.savefig(os.path.join(save_path, f"box_plot_compare_models.png"))
-    # plt.close()
-    #
-    # plt.boxplot(tmins.values(), labels=tmins.keys())
-    # plt.title(f'Compare Best tmins for Each Model')
-    # plt.xlabel('Model')
-    # plt.ylabel('tmin')
-    # plt.savefig(os.path.join(save_path, f"box_plot_compare_tmins.png"))
-    # plt.close()
 
     # Generate some random data for demonstration
     data_model1_dataset1 = np.load(os.path.join(ebg1_eegnet1d_path, "eegnet1d_w0.5.npy"))
@@ -544,13 +524,7 @@ def compare_models(save_path):
     plt.close()
 
 
-def compare_logreg_models(save_path):
-    ebg_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_12features_plots/" \
-               "logreg_ebg4_whole_ebg.npy"
-    eeg_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.5_1.5_12features_plots/" \
-               "logreg_ebg4_whole_eeg.npy"
-    sniff_path = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/logreg_ebg4_whole_sniff.npy"
-
+def compare_modalities(ebg_path, eeg_path, sniff_path, save_path, model):
     EBG_data = np.load(ebg_path)
     EEG_data = np.load(eeg_path)
     sniff_data = np.load(sniff_path)
@@ -559,9 +533,9 @@ def compare_logreg_models(save_path):
     EEG_mean = np.mean(EEG_data)
     sniff_mean = np.mean(sniff_data)
 
-    EBG_std = np.std(EBG_data)/np.sqrt(len(EBG_data))
-    EEG_std = np.std(EEG_data)/np.sqrt(len(EEG_data))
-    sniff_std = np.std(sniff_data)/np.sqrt(len(sniff_data))
+    EBG_std = np.std(EBG_data) / np.sqrt(len(EBG_data))
+    EEG_std = np.std(EEG_data) / np.sqrt(len(EEG_data))
+    sniff_std = np.std(sniff_data) / np.sqrt(len(sniff_data))
 
     # Plotting
     labels = ['EBG', 'EEG', 'Sniff']
@@ -585,12 +559,11 @@ def compare_logreg_models(save_path):
                     textcoords="offset points",
                     ha='center', va='bottom')
 
-    plt.savefig(os.path.join(save_path, "compare_logreg_whole.pdf"))
+    plt.savefig(os.path.join(save_path, f"compare_{model}_whole.pdf"))
     plt.show()
 
 
-def compare_subjects(ebg_file, eeg_file, sniff_file, save_path):
-
+def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
     # Load data from pickle file
     with open(ebg_file, 'rb') as file:
         EBG_data = pickle.load(file)
@@ -608,16 +581,17 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path):
 
     # Calculate mean and standard deviation for each data channel across subjects
     EBG_mean = np.array([np.mean(EBG_data[subject]) for subject in EBG_data.keys()])
-    EBG_std = np.array([np.std(EBG_data[subject])/np.sqrt(len(EBG_data[subject])) for subject in EBG_data.keys()])
+    EBG_std = np.array([np.std(EBG_data[subject]) / np.sqrt(len(EBG_data[subject])) for subject in EBG_data.keys()])
 
     EEG_mean = np.array([np.mean(EEG_data[subject]) for subject in EEG_data.keys()])
-    EEG_std = np.array([np.std(EEG_data[subject])/np.sqrt(len(EEG_data[subject])) for subject in EEG_data.keys()])
+    EEG_std = np.array([np.std(EEG_data[subject]) / np.sqrt(len(EEG_data[subject])) for subject in EEG_data.keys()])
 
     sniff_mean = np.array([np.mean(sniff_data[subject]) for subject in sniff_data.keys()])
-    sniff_std = np.array([np.std(sniff_data[subject])/np.sqrt(len(sniff_data[subject])) for subject in sniff_data.keys()])
+    sniff_std = np.array(
+        [np.std(sniff_data[subject]) / np.sqrt(len(sniff_data[subject])) for subject in sniff_data.keys()])
 
     # Plotting
-    x = np.arange(len(sorted_subjects))*1.5
+    x = np.arange(len(sorted_subjects)) * 1.5
     width = 0.3  # Width of the bars
 
     fig, ax = plt.subplots(figsize=(25, 8))
@@ -633,25 +607,25 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path):
     ax.legend()
     # plt.tight_layout()
     plt.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
-    plt.savefig(os.path.join(save_path, f"compare_subjects_whole_logreg.pdf"))
+    plt.savefig(os.path.join(save_path, f"compare_subjects_whole_{model}.pdf"))
     plt.show()
 
 
 if __name__ == "__main__":
-    task = "compare_logreg_models"
+    task = "compare_subjects_eegnet1d"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/"
-        compare_logreg_c(path_to_data, path_to_save, "sniff")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "eeg")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg_plots/"
-        plot_dnn_res(path_to_data, path_to_save)
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "sniff")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
@@ -668,14 +642,32 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots"
         compare_logreg_c(path_to_data, path_to_save)
     elif task == "compare_logreg_models":
+        # path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_12features_plots/" \
+        #               "logreg_ebg4_whole_ebg.npy"
+        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_plots/logreg_ebg4_whole_ebg.npy"
+        # path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.5_1.5_12features_plots/" \
+        #               "logreg_ebg4_whole_eeg.npy"
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7_plots/logreg_ebg4_whole_eeg.npy"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/logreg_ebg4_whole_sniff.npy"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/"
-        compare_logreg_models(path_to_save)
-    elif task == "compare_subjects":
+        compare_modalities(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save, "logreg")
+    elif task == "compare_eegnet1d_models":
+        path_to_ebg = "//Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_ebg_plots/eegnet1d_ebg4_whole_ebg.npy"
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg_plots/eegnet1d_ebg4_whole_eeg.npy"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff_plots/eegnet1d_ebg4_whole_sniff.npy"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
+        compare_modalities(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save, "eegnet1d")
+    elif task == "compare_subjects_logreg":
         path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.5_1.5_12features_plots/" \
                       "scores_subject_eeg.pkl"
         path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_12features_plots/" \
                       "scores_subject_ebg.pkl"
         path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/scores_subject_sniff.pkl"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg"
-        compare_subjects(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save)
-
+        compare_subjects(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save, model="logreg")
+    elif task == "compare_subjects_eegnet1d":
+        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_ebg_plots/scores_subjects_eegnet1d_ebg.pkl"
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg_plots/scores_subjects_eegnet1d_eeg.pkl"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff_plots/scores_subjects_eegnet1d_sniff.pkl"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
+        compare_subjects(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save, model="eegnet1d")
