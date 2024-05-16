@@ -24,19 +24,11 @@ class EBG4(Dataset):
         self.root_path = root_path
         if pick_subjects == 0:
             # if data_type != 'source':
-<<<<<<< HEAD
-            #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]    
-            # else:
-            #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
-            # print("***** Training On All Available Subject *****")
-            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
-=======
             #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]
             # else:
             #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
             subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
             print("***** Training On All Available Subject *****")
->>>>>>> c04e6734cc56f38549cfe71904c6316ae96cde51
         else:
             subjects = [pick_subjects]
             print(f"***** Training On Subject {pick_subjects} *****")
@@ -166,7 +158,7 @@ class EBG4(Dataset):
         sample = self.data[item, ...]
         if self.z_score:
             sample = \
-                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-06)
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
         sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 

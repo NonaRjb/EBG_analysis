@@ -13,7 +13,7 @@ data_constants = {
     'ebg_transform': None,
     'z_score': True,
     'shuffle_labels': False,
-    'modality': 'ebg',
+    'modality': 'ebg-sniff',
     'intensity': False,
     'n_classes': 2,
     'tfr_freqs': np.linspace(20, 100, 160),
