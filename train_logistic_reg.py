@@ -305,10 +305,6 @@ if __name__ == "__main__":
             collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 5, n_time_samples)  # 12, 5 is because I consider fmin=10 and fmax=70
             tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
 
-            # TODO: what if we also average over time for every 32 time samples?
-            # collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 16, 32)
-            # tfr_mean = np.mean(collapsed_tfr_mean, axis=-1)
-
             data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
 
             # X = tfr_mean
@@ -350,8 +346,8 @@ if __name__ == "__main__":
                 unique_test, counts_test = np.unique(y_test, return_counts=True)
 
                 print(f"Fold {fold + 1}:")
-                print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
-                print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
+                # print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
+                # print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
 
                 clf = clf.fit(X_train, y_train)
                 prob_scores = clf.predict_proba(X_test)[:, 1]
@@ -360,6 +356,7 @@ if __name__ == "__main__":
                 aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
                 aucroc_scores[str(subj)].append(aucroc_score)
                 # aucpr_scores.append(aucpr_score)
+                print(f"Model AUCROC = {aucroc_score}")
 
             if args.save is True:
                 print("Saving the AUC Scores")
@@ -431,8 +428,8 @@ if __name__ == "__main__":
             unique_test, counts_test = np.unique(y_test, return_counts=True)
 
             print(f"Fold {fold + 1}:")
-            print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
-            print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
+            # print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
+            # print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
             # dummy_aucpr_score = (counts_train[1] + counts_test[1]) / (counts_train.sum() + counts_test.sum())
             clf = clf.fit(X_train, y_train)
             prob_scores = clf.predict_proba(X_test)[:, 1]
