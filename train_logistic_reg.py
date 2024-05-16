@@ -172,9 +172,9 @@ def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_l
 
         if data_type == 'sensor' or data_type == 'sensor_ica':
             if modality == 'eeg':
-                data_subj = data_subj[:, :64, :]
+                data_subj = data_subj[:, :63, :]
             elif modality == 'ebg':
-                data_subj = data_subj[:, 64:, :]
+                data_subj = data_subj[:, 63:-1, :]
             else:
                 pass
 

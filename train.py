@@ -199,7 +199,7 @@ def main():
     elif constants.data_constants['modality'] == "eeg":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
-                constants.model_constants[key]['n_channels'] = 64
+                constants.model_constants[key]['n_channels'] = 63
     elif constants.data_constants['modality'] == "ebg-sniff":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
@@ -207,11 +207,11 @@ def main():
     elif constants.data_constants['modality'] == "eeg-sniff":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
-                constants.model_constants[key]['n_channels'] = 65
+                constants.model_constants[key]['n_channels'] = 64
     elif constants.data_constants['modality'] == "both-sniff":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
-                constants.model_constants[key]['n_channels'] = 69
+                constants.model_constants[key]['n_channels'] = 68
     elif constants.data_constants['modality'] == 'sniff':
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
@@ -219,7 +219,7 @@ def main():
     else:
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
-                constants.model_constants[key]['n_channels'] = 68
+                constants.model_constants[key]['n_channels'] = 67
     # load a sample subject's data to compute the number of time samples
     _, _, n_time_samples = load_data.load(
         dataset_name=dataset_name,
