@@ -5,7 +5,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.pipeline import make_pipeline
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, roc_auc_score, precision_recall_curve, auc
+from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import cross_validate
 from mne.decoding import CSP, UnsupervisedSpatialFilter
 from dataset.data_utils import load_ebg1_mat
@@ -162,7 +163,7 @@ def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_l
     fs = None
     for subject in subjects:
         data_subj, labels_subj, time_vec_subj, fs_subj = \
-            load_ebg4(root=root_path, subject_id=subject, data_type=data_type, fs_new=None)
+            load_ebg4(root=root_path, subject_id=subject, data_type=data_type, fs_new=256) #TODO
         if fs is None:
             fs = float(fs_subj)
 
@@ -241,7 +242,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "local"
+    loc = "remote"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -257,9 +258,9 @@ if __name__ == "__main__":
     w = args.w
 
     save_path = os.path.join(save_path, "plots")
-    save_path = os.path.join(save_path, "grid_search_c_tmin")
+    save_path = os.path.join(save_path, "grid_search_c")
     os.makedirs(save_path, exist_ok=True)
-    save_path = os.path.join(save_path, dataset_name)
+    save_path = os.path.join(save_path, dataset_name+"_"+args.modality)
     os.makedirs(save_path, exist_ok=True)
     data_path = os.path.join(data_path, dataset_name)
 
@@ -267,11 +268,11 @@ if __name__ == "__main__":
         if dataset_name == "ebg1":
             subject_ids = [i for i in range(1, 31) if i != 4]
         elif dataset_name == "ebg4":
-            subject_ids = [i for i in range(1, 26) if i != 10]
+            subject_ids = [i for i in range(1, 54) if i != 10]
         else:
             raise NotImplementedError
 
-        scores = {}
+        aucroc_scores = {}
         for subj in subject_ids:
             data_array, labels_array, t, sfreq = load_data(
                 name=dataset_name,
@@ -285,7 +286,7 @@ if __name__ == "__main__":
                 binary=True
             )
 
-            freqs = np.arange(20, 100)
+            freqs = np.arange(5, 100)
             tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
 
             # apply baseline correction
@@ -300,6 +301,13 @@ if __name__ == "__main__":
             # take the mean over channels
             tfr_mean = tfr.mean(axis=1).squeeze()
             n_trials = tfr_mean.shape[0]
+            n_time_samples = tfr_mean.shape[-1]
+            collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 5, n_time_samples)  # 12, 5 is because I consider fmin=10 and fmax=70
+            tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
+
+            # TODO: what if we also average over time for every 32 time samples?
+            # collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 16, 32)
+            # tfr_mean = np.mean(collapsed_tfr_mean, axis=-1)
 
             data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
 
@@ -312,9 +320,10 @@ if __name__ == "__main__":
             csp = CSP(n_components=4, reg=1e-05, log=None, transform_into='average_power', norm_trace=False)
 
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
-            scores[str(subj)] = []
+            aucroc_scores[str(subj)] = []
+            aucpr_scores = []
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-                clf = make_pipeline(  # StandardScaler(),
+                clf = make_pipeline(# StandardScaler(),
                     # csp,
                     LogisticRegression(C=c, penalty='l1', solver='liblinear', # l1_ratio=0.5,
                                        max_iter=2000,
@@ -346,15 +355,20 @@ if __name__ == "__main__":
 
                 clf = clf.fit(X_train, y_train)
                 prob_scores = clf.predict_proba(X_test)[:, 1]
-                auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-                scores[str(subj)].append(auc_score)
+                # precision, recall, _ = precision_recall_curve(y_test, prob_scores)
+                # aucpr_score = auc(recall, precision)
+                aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
+                aucroc_scores[str(subj)].append(aucroc_score)
+                # aucpr_scores.append(aucpr_score)
 
             if args.save is True:
                 print("Saving the AUC Scores")
                 os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
                 np.save(
-                    os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy"),
-                    np.asarray(scores[str(subj)])
+                    # os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy"),
+                    os.path.join(save_path, str(subj), f"{c}.npy"),
+                    np.asarray(aucroc_scores[str(subj)])
+                    # np.asarray(aucpr_scores)
                 )
         # score_values = scores.values()
         # score_keys = scores.keys()
@@ -401,13 +415,13 @@ if __name__ == "__main__":
         csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
         clf = make_pipeline(  # StandardScaler(),
             # csp,
-            LogisticRegression(C=c, penalty='elasticnet', solver='saga', l1_ratio=0.5,
+            LogisticRegression(C=c, penalty='l1', solver='liblinear', # l1_ratio=0.5,
                                max_iter=2000,
                                random_state=seed))
-
         skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
 
-        scores = []
+        aucroc_scores = []
+        aucpr_scores = []
         for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
@@ -419,23 +433,29 @@ if __name__ == "__main__":
             print(f"Fold {fold + 1}:")
             print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
             print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
-
+            # dummy_aucpr_score = (counts_train[1] + counts_test[1]) / (counts_train.sum() + counts_test.sum())
             clf = clf.fit(X_train, y_train)
             prob_scores = clf.predict_proba(X_test)[:, 1]
-            auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-            scores.append(auc_score)
+            # precision, recall, _ = precision_recall_curve(y_test, prob_scores)
+            # aucpr_score = auc(recall, precision)
+            aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
+            aucroc_scores.append(aucroc_score)
+            # aucpr_scores.append(aucpr_score)
+
+            # print(f"Model AUCPR = {aucpr_score} | Dummy AUCPR = {dummy_aucpr_score}")
+            print(f"Model AUCROC = {aucroc_score}")
 
         if args.save is True:
             print("Saving the AUC Scores")
             os.makedirs(os.path.join(save_path, str(args.subject_id)), exist_ok=True)
             np.save(
                 os.path.join(save_path, str(args.subject_id), f"{c}.npy"),
-                np.asarray(scores)
+                np.asarray(aucroc_scores)
             )
-        plt.boxplot(scores, labels=[str(args.subject_id)])
+        plt.boxplot(aucroc_scores, labels=[str(args.subject_id)])
         plt.axhline(y=0.5, color='r', linestyle='--')
         plt.title(f"AUC Scores Subject {args.subject_id}, C = {c}")
         os.makedirs(os.path.join(save_path, "plots"), exist_ok=True)
         os.makedirs(os.path.join(save_path, "plots", str(args.subject_id)), exist_ok=True)
-        plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"s{args.subject_id}_c{c}.png"))
+        plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"c{c}.png"))
         # plt.show()
