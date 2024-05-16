@@ -44,11 +44,11 @@ if __name__ == "__main__":
         save_path = cluster_save_path
     data_path = os.path.join(data_path, "ebg4")
     save_path = os.path.join(save_path, "plots")
-    save_path = os.path.join(save_path, "sniff")
-    os.makedirs(save_path, exist_ok=True)
     save_path = os.path.join(save_path, "grid_search_c")
     os.makedirs(save_path, exist_ok=True)
-
+    save_path = os.path.join(save_path, "sniff")
+    os.makedirs(save_path, exist_ok=True)
+    
     args = parse_args()
     seed = args.seed
     c = args.c
