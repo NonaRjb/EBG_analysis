@@ -118,6 +118,8 @@ def load_sensor_ebg4(filename, fs_new=None):
     time = np.asarray(time)
     labels = data_struct['data_eeg']['trialinfo'].squeeze()
     labels = labels[:, 0]
+    channels = data_struct['data_eeg_ica']['label']
+    channels = [ch[0] for ch in channels]
     fs = 512
 
     if fs_new is None:
@@ -138,6 +140,8 @@ def load_sensor_ica_ebg4(filename, fs_new=None):
     time = np.asarray(time)
     labels = data_struct['data_eeg_ica']['trialinfo'].squeeze()
     labels = labels[:, 0]
+    channels = data_struct['data_eeg_ica']['label']
+    channels = [ch[0] for ch in channels]
     fs = 512
 
     if fs_new is None:
