@@ -7,30 +7,77 @@ from scipy import stats
 import os
 import re
 
+from collections import Counter
+
 colors = {
     "eeg": '#DDCC77',
     "ebg": '#CC6677',
-    "sniff": '#44AA99'
+    "sniff": '#44AA99',
+    "source": '#88CCEE'
 }
 
 
-def compare_logreg_c_tmin(root_path, w_size, save_path):
-    os.makedirs(os.path.join(save_path, "w" + str(w_size)), exist_ok=True)
+def horizontal_bar_subject(scores, modality, model, save_path):
+    # Calculate mean performance and standard deviation for each subject
+    mean_performances = {subject: np.mean(performances) for subject, performances in scores.items()}
+    std_performances = {subject: np.std(performances) / np.sqrt(len(performances)) for subject, performances in
+                        scores.items()}
+
+    # Sort subjects based on mean performance
+    sorted_subjects = sorted(mean_performances, key=lambda s: (mean_performances[s], int(s)))
+    sorted_mean_performances = [mean_performances[subject] for subject in sorted_subjects]
+    sorted_std_performances = [std_performances[subject] for subject in sorted_subjects]
+
+    # Plotting
+    fig, ax = plt.subplots(figsize=(5, 10))  # Adjust size as needed
+    y = np.arange(len(scores))
+    y_spaced = np.linspace(0, len(scores) * 1.2, len(scores))
+    bars = ax.barh(y_spaced, sorted_mean_performances, xerr=sorted_std_performances, capsize=2, color=colors[modality],
+                   zorder=3)
+    ax.axvline(x=0.5, color='red', linestyle='--', zorder=4)
+    ax.set_yticks(y_spaced)
+    ax.set_yticklabels(sorted_subjects)
+    ax.set_xlabel('AUC-ROC')
+    ax.set_ylabel('Subject')
+    # Add gridlines every 0.1 unit
+    ax.xaxis.set_major_locator(plt.MultipleLocator(0.1))
+    ax.grid(which='major', axis='x', linestyle='--', color='0.92', linewidth=0.5, zorder=0)
+    plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'],
+               loc='lower right')
+    ax.set_title(f'Average AUC by Subject ({modality.upper()})')
+    plt.tight_layout()  # Adjust layout to prevent clippirng of labels
+    plt.savefig(os.path.join(save_path, f"auc_bar_plots_{model}_{modality}.pdf"))
+    plt.close()
+
+    np.save(os.path.join(save_path, f"{model}_ebg4_whole_{modality}.npy"), sorted_mean_performances)
+
+    return
+
+
+def compare_logreg_c_tmin(root_path, save_path, modality):
+    # os.makedirs(os.path.join(save_path, "w" + str(w_size)), exist_ok=True)
 
     pattern = r"c(\d+(\.\d+)?)_t(-?\d+(\.\d+)?)\.npy"
 
     best_c = {}
     best_tmin = {}
     best_scores = {}
-    medians = []
+    metrics = []
     subjects = os.listdir(root_path)
+    subjects = [int(s) for s in subjects]
+    subjects.sort()
+    subjects = [str(s) for s in subjects]
     for subject in subjects:
 
         scores = {}
         for filename in os.listdir(os.path.join(root_path, subject)):
+            select_t = re.match(pattern, filename)
+            if float(select_t.group(3)) == -0.6:
+                continue
             scores[filename] = np.load(os.path.join(root_path, subject, filename))
+            scores[filename] = [i for i in scores[filename] if i != 0]
 
-        best_param_subj, best_median_subj = find_best_param(scores)
+        best_param_subj, best_metric_subj = find_best_param(scores, metric="mean")
         match = re.match(pattern, best_param_subj)
         if match:
             # Extract X and Y values from the matched groups
@@ -40,33 +87,20 @@ def compare_logreg_c_tmin(root_path, w_size, save_path):
             best_c[subject] = c
             best_tmin[subject] = tmin
         best_scores[subject] = scores[best_param_subj]
-        medians.append(best_median_subj)
+        metrics.append(best_metric_subj)
+        print(f"Subject {subject}: tmin={best_tmin[subject]}, auc={best_metric_subj}")
 
-    # sort dict
-    auc_keys = list(best_scores.keys())
-    auc_keys = [int(k) for k in auc_keys]
-    auc_keys.sort()
-    sorted_best_scores = {str(k): best_scores[str(k)] for k in auc_keys}
-    auc_scores = sorted_best_scores.values()
+    horizontal_bar_subject(best_scores, modality, "logreg", save_path)
 
-    plt.figure(figsize=(15, 6))
-    plt.boxplot(auc_scores, labels=auc_keys)
+    plt.boxplot(metrics, labels=["Logistic Regression"])
+    plt.axhline(y=0.5, color='r', linestyle='--')
     plt.title(f'Boxplot of Best AUC Scores for All Subjects')
-    plt.xlabel('Subject ID')
-    plt.ylabel('AUC Score')
-    plt.axhline(y=0.5, color='r', linestyle='--')
-    plt.savefig(os.path.join(save_path, "w" + str(w_size), f"auc_box_plots_logreg_c_tmin.png"))
-    plt.close()
-
-    plt.boxplot(medians, labels=["Logistic Regression"])
-    plt.axhline(y=0.5, color='r', linestyle='--')
-    plt.title(f'Boxplot of Best AUC Scores for All Subjects Window Size {w_size}')
     plt.xlabel('Model')
     plt.ylabel('AUC Score')
-    plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_logreg_single_plot.png"))
+    plt.savefig(os.path.join(save_path, f"box_plot_logreg_single_plot_{modality}.png"))
     plt.close()
 
-    print(f"Median of Best Medians is: {np.median(medians)}")
+    print(f"Median of Best Medians is: {np.median(metrics)}")
 
     tmins = best_tmin.values()
     plt.figure()
@@ -74,13 +108,20 @@ def compare_logreg_c_tmin(root_path, w_size, save_path):
     plt.title("Boxplot of Best Tmin Values for Logistic Regression")
     plt.xlabel("Dataset")
     plt.ylabel("Tmin Values")
-    plt.savefig(os.path.join(save_path, "w" + str(w_size), f"box_plot_logreg_tmins.png"))
+    plt.savefig(os.path.join(save_path, f"box_plot_logreg_tmins_{modality}.png"))
     plt.close()
 
     print(f"Median of Best Tmins is: {np.median(list(tmins))}")
 
-    np.save(os.path.join(save_path, "w" + str(w_size), "logreg_w" + str(w_size) + ".npy"), np.asarray(medians))
-    np.save(os.path.join(save_path, "w" + str(w_size), "logreg_t_w" + str(w_size) + ".npy"), np.asarray(list(tmins)))
+    # Use Counter to count the occurrences of each unique value
+    counter = Counter(list(tmins))
+
+    # Convert to dictionary if you need
+    count_dict = dict(counter)
+
+    print(count_dict)
+    # np.save(os.path.join(save_path, "logreg_" + ".npy"), np.asarray(metrics))
+    # np.save(os.path.join(save_path, "logreg_t_" + ".npy"), np.asarray(list(tmins)))
 
     return
 
@@ -110,28 +151,8 @@ def compare_logreg_c(root_path, save_path, modality):
 
     with open(os.path.join(save_path, f"scores_subject_{modality}.pkl"), 'wb') as f:
         pickle.dump(best_scores, f)
-    # Calculate mean performance and standard deviation for each subject
-    mean_performances = {subject: np.mean(performances) for subject, performances in best_scores.items()}
-    std_performances = {subject: np.std(performances) for subject, performances in best_scores.items()}
 
-    # Sort subjects based on mean performance
-    sorted_subjects = sorted(mean_performances, key=mean_performances.get)
-    sorted_mean_performances = [mean_performances[subject] for subject in sorted_subjects]
-    sorted_std_performances = [std_performances[subject] for subject in sorted_subjects]
-
-    # Plotting
-    fig, ax = plt.subplots(figsize=(10, 10))  # Adjust size as needed
-    y = np.arange(len(best_scores))
-    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color=colors[modality])
-    ax.axvline(x=0.5, color='red', linestyle='--')
-    ax.set_yticks(y)
-    ax.set_yticklabels(sorted_subjects)
-    ax.set_xlabel('AUC-ROC')
-    plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'])
-    ax.set_title(f'Sorted Average Performance by Subject ({modality.capitalize()})')
-    plt.tight_layout()  # Adjust layout to prevent clipping of labels
-    plt.savefig(os.path.join(save_path, f"auc_bar_plots_logreg_c_{modality}.pdf"))
-    plt.close()
+    horizontal_bar_subject(best_scores, modality, "logreg", save_path)
 
     plt.boxplot(best_metric, labels=["Logistic Regression"])
     plt.axhline(y=0.5, color='r', linestyle='--')
@@ -142,8 +163,6 @@ def compare_logreg_c(root_path, save_path, modality):
     plt.close()
 
     print(f"Median of Best Average is: {np.median(best_metric)}")
-
-    np.save(os.path.join(save_path, f"logreg_ebg4_whole_{modality}.npy"), sorted_mean_performances)
 
     return
 
@@ -524,24 +543,27 @@ def compare_models(save_path):
     plt.close()
 
 
-def compare_modalities(ebg_path, eeg_path, sniff_path, save_path, model):
+def compare_modalities(ebg_path, eeg_path, sniff_path, source_path, save_path, model):
     EBG_data = np.load(ebg_path)
     EEG_data = np.load(eeg_path)
     sniff_data = np.load(sniff_path)
+    source_data = np.load(source_path)
     # Calculate mean and standard deviation for each data modality
     EBG_mean = np.mean(EBG_data)
     EEG_mean = np.mean(EEG_data)
     sniff_mean = np.mean(sniff_data)
+    source_mean = np.mean(source_data)
 
     EBG_std = np.std(EBG_data) / np.sqrt(len(EBG_data))
     EEG_std = np.std(EEG_data) / np.sqrt(len(EEG_data))
     sniff_std = np.std(sniff_data) / np.sqrt(len(sniff_data))
+    source_std = np.std(source_data) / np.sqrt(len(source_data))
 
     # Plotting
-    labels = ['EBG', 'EEG', 'Sniff']
-    means = [EBG_mean, EEG_mean, sniff_mean]
-    stds = [EBG_std, EEG_std, sniff_std]
-    colors_ = [colors['ebg'], colors['eeg'], colors['sniff']]
+    labels = ['EBG', 'EEG', 'Sniff', 'Source']
+    means = [EBG_mean, EEG_mean, sniff_mean, source_mean]
+    stds = [EBG_std, EEG_std, sniff_std, source_std]
+    colors_ = [colors['ebg'], colors['eeg'], colors['sniff'], colors['source']]
 
     fig, ax = plt.subplots(figsize=(4, 4))
     bars = ax.bar(labels, means, yerr=stds, capsize=5, color=colors_, width=0.5)
@@ -612,11 +634,11 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
 
 
 if __name__ == "__main__":
-    task = "compare_subjects_eegnet1d"
+    task = "compare_logreg_c_tmin"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7_plots/"
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6_plots/"
         compare_logreg_c(path_to_data, path_to_save, "eeg")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
@@ -634,23 +656,25 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/compare_models"
         compare_models(path_to_save)
     elif task == "compare_logreg_c_tmin":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/grid_search_c_tmin/ebg1"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/grid_search_c_tmin/plots_c_tmin_ebg1"
-        compare_logreg_c_tmin(path_to_data, 0.5, path_to_save)
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_ebg_logratio_-1.0_-0.6/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_ebg_logratio_-1.0_-0.6_plots/"
+        compare_logreg_c_tmin(path_to_data, path_to_save, "ebg")
     elif task == "compare_logreg_c_sniff":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots"
         compare_logreg_c(path_to_data, path_to_save)
     elif task == "compare_logreg_models":
-        # path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_12features_plots/" \
-        #               "logreg_ebg4_whole_ebg.npy"
-        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_plots/logreg_ebg4_whole_ebg.npy"
-        # path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.5_1.5_12features_plots/" \
-        #               "logreg_ebg4_whole_eeg.npy"
-        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7_plots/logreg_ebg4_whole_eeg.npy"
-        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots/logreg_ebg4_whole_sniff.npy"
+        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_bl_-1.0_-0.6_plots/" \
+                      "logreg_ebg4_whole_ebg.npy"
+        # path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_ebg_resampled_-0.5_1.5_plots/logreg_ebg4_whole_ebg.npy"
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6_plots/" \
+                      "logreg_ebg4_whole_eeg.npy"
+        # path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/ebg4_eeg_resampled_-0.8_1.7_plots/logreg_ebg4_whole_eeg.npy"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff_-0.5_1.5_plots/logreg_ebg4_whole_sniff.npy"
+        path_to_source = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_source_plots/" \
+                         "logreg_ebg4_whole_source.npy"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/"
-        compare_modalities(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save, "logreg")
+        compare_modalities(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_save, "logreg")
     elif task == "compare_eegnet1d_models":
         path_to_ebg = "//Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_ebg_plots/eegnet1d_ebg4_whole_ebg.npy"
         path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_eeg_plots/eegnet1d_ebg4_whole_eeg.npy"
