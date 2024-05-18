@@ -290,7 +290,7 @@ if __name__ == "__main__":
             tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
 
             # apply baseline correction
-            tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
+            tfr = apply_baseline(tfr, bl_lim=(-1.0, -0.6), tvec=t, mode='logratio')
 
             # crop the time interval of interest
             tfr = crop_tfr(tfr,
@@ -298,12 +298,18 @@ if __name__ == "__main__":
                            fmin=args.fmin, fmax=args.fmax,
                            tvec=t, freqs=freqs,
                            w=w)
-            # take the mean over channels
-            tfr_mean = tfr.mean(axis=1).squeeze()
-            n_trials = tfr_mean.shape[0]
-            n_time_samples = tfr_mean.shape[-1]
-            collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 5, n_time_samples)  # 12, 5 is because I consider fmin=10 and fmax=70
-            tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
+            
+            n_trials = tfr.shape[0]
+            n_time_samples = tfr.shape[-1]
+
+            if args.data_type == "source":
+                collapsed_tfr_mean = tfr.reshape(n_trials, 4, 12, 5, n_time_samples)
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+            else:
+                # take the mean over channels
+                tfr_mean = tfr.mean(axis=1).squeeze()
+                collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 5, n_time_samples)  # 12, 5 is because I consider fmin=10 and fmax=70
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
 
             data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
 
@@ -394,7 +400,7 @@ if __name__ == "__main__":
                 binary=True
             )
 
-        freqs = np.arange(20, 100)
+        freqs = np.arange(5, 100)
         tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
 
         # apply baseline correction

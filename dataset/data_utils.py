@@ -157,7 +157,7 @@ def load_sensor_ica_ebg4(filename, fs_new=None):
 def load_source_ebg4(filename):
     print(f"********** loading source data from {filename} **********")
 
-    mat73_files = [21, 22, 23, 24, 25]
+    mat73_files = [i for i in range(21, 54)]
     if int(filename.split("/")[-2]) in mat73_files:
         data_struct = mat73.loadmat(filename)
 
@@ -281,7 +281,7 @@ def apply_baseline(tfr, bl_lim, tvec, mode):
     else:
         baseline_min = np.abs(tvec - bl_lim[0]).argmin()
     if bl_lim[1] is None:
-        baseline_max = len(tvec) - 1
+        baseline_max = len(tvec)
     else:
         baseline_max = np.abs(tvec - bl_lim[1]).argmin()
 
