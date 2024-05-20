@@ -1,5 +1,6 @@
 from models.architectures import EEGNet, EEGNet1D, TFRNet, LSTMClassifier, RNNClassifier, ResNet1d
 from sklearn.linear_model import LogisticRegression
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn import ensemble
 from xgboost import XGBClassifier
 
@@ -30,3 +31,5 @@ def load_ml_model(model_name, **kwargs):
         return ensemble.GradientBoostingClassifier(**kwargs)
     if model_name == "xgboost":
         return XGBClassifier(**kwargs)
+    if model_name == "lda":
+        return LinearDiscriminantAnalysis(**kwargs)

@@ -135,6 +135,7 @@ def compare_logreg_c(root_path, save_path, modality):
 
     subjects = os.listdir(root_path)
     best_scores = {}
+    best_params = {}
     best_metric = []
     for subject in subjects:
 
@@ -147,9 +148,11 @@ def compare_logreg_c(root_path, save_path, modality):
                 scores[c] = [i for i in scores[c] if i != 0]
         best_param_subj, best_metric_subj = find_best_param(scores, metric="mean")
         best_scores[subject] = scores[best_param_subj]
+        best_params[subject] = best_param_subj
         print(f"Subject {subject}: maximum auc median = {best_metric_subj}, C = {best_param_subj}")
         best_metric.append(best_metric_subj)
-
+    with open(os.path.join(save_path, f"logreg_best_c_{modality}.pkl"), 'wb') as f:
+        pickle.dump(best_params, f)
     with open(os.path.join(save_path, f"scores_subject_{modality}.pkl"), 'wb') as f:
         pickle.dump(best_scores, f)
 
@@ -614,20 +617,20 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
 
 
 if __name__ == "__main__":
-    task = "plot_dnn_res"
+    task = "compare_logreg_c"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_gradboost/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_gradboost_plots/"
-        compare_logreg_c(path_to_data, path_to_save, "ebg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_source/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_source_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "source")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "eeg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "source")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
@@ -636,9 +639,9 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/compare_models"
         compare_models(path_to_save)
     elif task == "compare_logreg_c_tmin":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_ebg_logratio_-1.0_-0.6/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_ebg_logratio_-1.0_-0.6_plots/"
-        compare_logreg_c_tmin(path_to_data, path_to_save, "ebg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_source_logratio_-1.0_-0.6/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_source_logratio_-1.0_-0.6_plots/"
+        compare_logreg_c_tmin(path_to_data, path_to_save, "source")
     elif task == "compare_logreg_c_sniff":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots"
