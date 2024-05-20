@@ -1,4 +1,7 @@
 from models.architectures import EEGNet, EEGNet1D, TFRNet, LSTMClassifier, RNNClassifier, ResNet1d
+from sklearn.linear_model import LogisticRegression
+from sklearn import ensemble
+from xgboost import XGBClassifier
 
 
 def load(model_name: str, **kwargs):
@@ -18,3 +21,12 @@ def load(model_name: str, **kwargs):
         return ResNet1d(**kwargs)
     else:
         raise NotImplementedError
+
+
+def load_ml_model(model_name, **kwargs):
+    if model_name == "logreg":
+        return LogisticRegression(**kwargs)
+    if model_name == "gradboost":
+        return ensemble.GradientBoostingClassifier(**kwargs)
+    if model_name == "xgboost":
+        return XGBClassifier(**kwargs)
