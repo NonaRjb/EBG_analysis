@@ -10,6 +10,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import cross_validate
 from mne.decoding import CSP, UnsupervisedSpatialFilter
 from dataset.data_utils import load_ebg1_mat
+from models.load_model import load_ml_model
 import matplotlib.pyplot as plt
 import pickle
 import numpy as np
@@ -24,31 +25,35 @@ cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Volumes/T5 EVO/Smell/"
 
-c_dict_ebg4 = {
-    '1': 1.0,
-    '2': 1.0,
-    '3': 64.0,
-    '4': 64.0,
-    '5': 1.0,
-    '6': 32.0,
-    '7': 1.0,
-    '8': 1.0,
-    '9': 1.0,
-    '11': 4.0,
-    '12': 32.0,
-    '13': 32.0,
-    '14': 0.5,
-    '15': 1.0,
-    '16': 64.0,
-    '17': 16.0,
-    '18': 1.0,
-    '19': 0.5,
-    '20': 0.5,
-    '21': 4.0,
-    '22': 0.5,
-    '23': 0.5,
-    '24': 16.0,
-    '25': 0.5
+model_kwargs = {
+    'logreg':{
+        'C': 1.0, 
+        'penalty': 'l1', 
+        'solver': 'liblinear',
+        'max_iter': 2000,
+        'random_state': 42
+        },
+    'gradboost':{
+        "n_estimators": 100,
+        "learning_rate": 0.1,
+        "subsample": 0.5, 
+        "max_leaf_nodes": 4,
+        "max_depth": 5,
+        "min_samples_split": 5,
+        "alpha": 1.0,
+        "random_state": 42
+    },
+    'xgboost':{
+        "objective": 'binary:logistic',
+        "n_estimators": 100,
+        "learning_rate": 0.1,
+        "subsample": 0.5, 
+        "max_leaf_nodes": 4,
+        "max_depth": None,
+        "min_loss_split": 2,
+        "alpha": 1.0,
+        "random_state": 42 
+    }
 }
 
 
@@ -235,6 +240,7 @@ def parse_args():
     parser.add_argument('-c', type=float, default=1.0)
     parser.add_argument('--data_type', type=str, default="sensor_ica")
     parser.add_argument('--modality', type=str, default="ebg")
+    parser.add_argument('--model', type=str, default='logreg')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save', action='store_true')
     return parser.parse_args()
@@ -257,10 +263,22 @@ if __name__ == "__main__":
     c = args.c
     w = args.w
 
+    for k in model_kwargs.keys():
+        if 'random_state' in model_kwargs[k].keys():
+            model_kwargs[k]['random_state'] = seed
+        if 'C' in model_kwargs[k].keys():
+            model_kwargs[k]['C'] = c
+        if 'alpha' in model_kwargs[k].keys():
+            model_kwargs[k]['alpha'] = c
+
     save_path = os.path.join(save_path, "plots")
-    save_path = os.path.join(save_path, "grid_search_c")
+    save_path = os.path.join(save_path, "grid_search_c" if w is None else "grid_search_c_tmin")
     os.makedirs(save_path, exist_ok=True)
-    save_path = os.path.join(save_path, dataset_name+"_"+args.modality)
+    if args.data_type != "source":
+        save_path = os.path.join(save_path, dataset_name+"_"+args.modality+"_"+args.model)
+    else:
+        save_path = os.path.join(save_path, dataset_name+"_"+args.data_type+"_"+args.model)
+    
     os.makedirs(save_path, exist_ok=True)
     data_path = os.path.join(data_path, dataset_name)
 
@@ -303,12 +321,12 @@ if __name__ == "__main__":
             n_time_samples = tfr.shape[-1]
 
             if args.data_type == "source":
-                collapsed_tfr_mean = tfr.reshape(n_trials, 4, 12, 5, n_time_samples)
+                collapsed_tfr_mean = tfr.reshape((n_trials, 4, 12, 5, n_time_samples))
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
             else:
                 # take the mean over channels
                 tfr_mean = tfr.mean(axis=1).squeeze()
-                collapsed_tfr_mean = tfr_mean.reshape(n_trials, 12, 5, n_time_samples)  # 12, 5 is because I consider fmin=10 and fmax=70
+                collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
 
             data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
@@ -325,23 +343,8 @@ if __name__ == "__main__":
             aucroc_scores[str(subj)] = []
             aucpr_scores = []
             for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-                clf = make_pipeline(# StandardScaler(),
-                    # csp,
-                    LogisticRegression(C=c, penalty='l1', solver='liblinear', # l1_ratio=0.5,
-                                       max_iter=2000,
-                                       random_state=seed))
-                # clf = make_pipeline(  # StandardScaler(),
-                #     csp,
-                #     LinearDiscriminantAnalysis())
-                # clf = make_pipeline(csp,
-                #                     StandardScaler(),
-                #                     SVC(C=.6,
-                #                         kernel='rbf',
-                #                         degree=3,
-                #                         probability=True,
-                #                         class_weight='balanced',
-                #                         random_state=seed))
-
+                clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
+                
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
@@ -368,23 +371,9 @@ if __name__ == "__main__":
                 print("Saving the AUC Scores")
                 os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
                 np.save(
-                    # os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy"),
-                    os.path.join(save_path, str(subj), f"{c}.npy"),
+                    os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy") if w is not None else os.path.join(save_path, str(subj), f"{c}.npy"),
                     np.asarray(aucroc_scores[str(subj)])
-                    # np.asarray(aucpr_scores)
                 )
-        # score_values = scores.values()
-        # score_keys = scores.keys()
-        # plt.figure(figsize=(40, 6))
-        # plt.boxplot(score_values, labels=score_keys)
-        # plt.title('Boxplot of AUC Scores for Each Subject ')
-        # plt.xlabel('Subject ID')
-        # plt.ylabel('AUC Score')
-        # plt.axhline(y=0.5, color='r', linestyle='--')
-        # plt.savefig(
-        #     os.path.join(save_path,
-        #                  f"auc_box_plot_log_reg_t{args.tmin}_w{args.w}_c{c}.png"))
-        # plt.show()
     else:
 
         data_array, labels_array, t, sfreq = \
@@ -404,7 +393,7 @@ if __name__ == "__main__":
         tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
 
         # apply baseline correction
-        tfr = apply_baseline(tfr, bl_lim=(None, None), tvec=t, mode='logratio')
+        tfr = apply_baseline(tfr, bl_lim=(-1.0, -0.6), tvec=t, mode='logratio')
 
         # crop the time interval of interest
         tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
@@ -416,11 +405,7 @@ if __name__ == "__main__":
         y = np.asarray(labels_array)
 
         csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
-        clf = make_pipeline(  # StandardScaler(),
-            # csp,
-            LogisticRegression(C=c, penalty='l1', solver='liblinear', # l1_ratio=0.5,
-                               max_iter=2000,
-                               random_state=seed))
+        clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
         skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
 
         aucroc_scores = []
@@ -452,9 +437,9 @@ if __name__ == "__main__":
             print("Saving the AUC Scores")
             os.makedirs(os.path.join(save_path, str(args.subject_id)), exist_ok=True)
             np.save(
-                os.path.join(save_path, str(args.subject_id), f"{c}.npy"),
-                np.asarray(aucroc_scores)
-            )
+                    os.path.join(save_path, str(args.subject_id), f"c{c}_t{args.tmin}.npy") if w is not None else os.path.join(save_path, str(args.subject_id), f"{c}.npy"),
+                    np.asarray(aucroc_scores[str(args.subject_id)])
+                )
         plt.boxplot(aucroc_scores, labels=[str(args.subject_id)])
         plt.axhline(y=0.5, color='r', linestyle='--')
         plt.title(f"AUC Scores Subject {args.subject_id}, C = {c}")
