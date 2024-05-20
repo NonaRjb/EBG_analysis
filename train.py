@@ -186,13 +186,20 @@ def main():
         "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
         "save_path": cluster_save_path if device == 'cuda' else local_save_path
     }
-    directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
+    if "source" not in args.data:
+        directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
+    else:
+        directory_name = f"{dataset_name}_{eeg_enc_name}"
     os.makedirs(os.path.join(main_paths['save_path'], directory_name), exist_ok=True)
     constants.data_constants['tmin'] = args.tmin
     constants.data_constants['tmax'] = args.tmax
     constants.data_constants['w'] = args.w
     constants.data_constants['ebg_transform'] = args.ebg_transform
-    if constants.data_constants['modality'] == "ebg":
+    if "source" in args.data:
+        for key in constants.model_constants.keys():
+            if "n_channels" in constants.model_constants[key].keys():
+                constants.model_constants[key]['n_channels'] = 4
+    elif constants.data_constants['modality'] == "ebg":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 4

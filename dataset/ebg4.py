@@ -27,14 +27,14 @@ class EBG4(Dataset):
             #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]
             # else:
             #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
-            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+            subjects = [subject_id for subject_id in range(1, 54) if subject_id != 10]
             print("***** Training On All Available Subject *****")
         else:
             subjects = [pick_subjects]
             print(f"***** Training On Subject {pick_subjects} *****")
 
-        self.baseline_min = -0.5
-        self.baseline_max = -0.2
+        self.baseline_min = -1.0
+        self.baseline_max = -0.6
         self.z_score = z_score
         self.source_data = None
         self.labels = None
@@ -140,9 +140,9 @@ class EBG4(Dataset):
             self.class_weight = torch.tensor(class_0_count / class_1_count)
         elif binary:
             # only consider high intensity odors
-            # mask = np.logical_not(np.isin(self.labels.squeeze(), [1, 2, 4]))
-            # self.source_data = self.source_data[mask, ...]
-            # self.labels = self.labels[mask]
+            mask = np.logical_not(np.isin(self.labels.squeeze(), [1, 2, 4]))
+            self.source_data = self.source_data[mask, ...]
+            self.labels = self.labels[mask]
             new_labels = [1. if y == 64 else 0. for y in self.labels]
             self.labels = new_labels
             class_0_count = new_labels.count(0.)
