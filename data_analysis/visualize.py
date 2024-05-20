@@ -44,6 +44,7 @@ def horizontal_bar_subject(scores, modality, model, save_path):
     ax.grid(which='major', axis='x', linestyle='--', color='0.92', linewidth=0.5, zorder=0)
     plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'],
                loc='lower right')
+    ax.set_xlim(0, 1)
     ax.set_title(f'Average AUC by Subject ({modality.upper()})')
     plt.tight_layout()  # Adjust layout to prevent clippirng of labels
     plt.savefig(os.path.join(save_path, f"auc_bar_plots_{model}_{modality}.pdf"))
@@ -270,28 +271,7 @@ def plot_dnn_res(root_path, save_path, modality):
     with open(os.path.join(save_path, f"scores_subjects_eegnet1d_{modality}.pkl"), 'wb') as f:
         pickle.dump(scores, f)
 
-    # Calculate mean performance and standard deviation for each subject
-    mean_performances = {subject: np.mean(performances) for subject, performances in aucs.items()}
-    std_performances = {subject: np.std(performances) for subject, performances in aucs.items()}
-
-    # Sort subjects based on mean performance
-    sorted_subjects = sorted(mean_performances, key=mean_performances.get)
-    sorted_mean_performances = [mean_performances[subject] for subject in sorted_subjects]
-    sorted_std_performances = [std_performances[subject] for subject in sorted_subjects]
-
-    # Plotting
-    fig, ax = plt.subplots(figsize=(10, 10))  # Adjust size as needed
-    y = np.arange(len(aucs))
-    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color=colors[modality])
-    ax.axvline(x=0.5, color='red', linestyle='--')
-    ax.set_yticks(y)
-    ax.set_yticklabels(sorted_subjects)
-    ax.set_xlabel('AUC-ROC')
-    plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'])
-    ax.set_title('Sorted Average Performance by Subject (EBG)')
-    plt.tight_layout()  # Adjust layout to prevent clipping of labels
-    plt.savefig(os.path.join(save_path, f"auc_bar_plots_eegnet1d_c_{modality}.pdf"))
-    plt.close()
+    horizontal_bar_subject(scores, modality, "eegnet1d", save_path)
 
     epoch_vals = epochs.values()
     epoch_keys = epochs.keys()
@@ -634,20 +614,20 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
 
 
 if __name__ == "__main__":
-    task = "compare_logreg_c_tmin"
+    task = "plot_dnn_res"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6_plots/"
-        compare_logreg_c(path_to_data, path_to_save, "eeg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_gradboost/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_gradboost_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "ebg")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "sniff")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "eeg")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
