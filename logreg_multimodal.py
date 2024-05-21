@@ -289,7 +289,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    loc = "local"
+    loc = "remote"
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
@@ -406,12 +406,16 @@ if __name__ == "__main__":
             prob1_scores = clf1.predict_proba(X1_test)[:, 1]
             prob2_scores = clf2.predict_proba(X2_test)[:, 1]
 
-            fpr1, tpr1, thresholds1 = roc_curve(y_test, prob1_scores)
-            fpr2, tpr2, thresholds2 = roc_curve(y_test, prob2_scores)
-            # aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-            # aucroc_scores[str(subj)].append(aucroc_score)
-            # aucpr_scores.append(aucpr_score)
-            # print(f"Model AUCROC = {aucroc_score}")
+            # fpr1, tpr1, thresholds1 = roc_curve(y_test, prob1_scores)
+            # fpr2, tpr2, thresholds2 = roc_curve(y_test, prob2_scores)
+
+            prob_scores = np.concatenate((np.expand_dims(prob1_scores, axis=1), np.expand_dims(prob2_scores, axis=1)),
+                                         axis=1)
+            prob_scores = prob_scores.mean(axis=-1)
+            aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
+            aucroc_scores[str(subj)].append(aucroc_score)
+
+            print(f"Model AUCROC = {aucroc_score}")
             print("")
 
         if args.save is True:

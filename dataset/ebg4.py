@@ -42,6 +42,7 @@ class EBG4(Dataset):
         self.fs = None
         self.time_vec = None
         self.class_weight = None
+        self.modality = modality
 
         for i, subject in enumerate(subjects):
             source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type, fs_new=fs_new)
@@ -156,7 +157,13 @@ class EBG4(Dataset):
 
         self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
-        self.data = self.data[..., self.t_min:self.t_max] - self.baseline
+        if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
+            self.data = self.data[..., self.t_min:self.t_max]
+            self.data[:, :-1, :] -= self.baseline[:, :-1, :]
+        elif self.modality == "sniff":
+            self.data = self.data[..., self.t_min:self.t_max]
+        else:
+            self.data = self.data[..., self.t_min:self.t_max] - self.baseline
 
     def __len__(self):
         return len(self.labels)
@@ -165,9 +172,15 @@ class EBG4(Dataset):
         if torch.is_tensor(item):
             item = item.tolist()
         sample = self.data[item, ...]
-        if self.z_score:
+        if self.z_score or self.modality == "sniff":
             sample = \
                 (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
+
+        if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
+            sample_zscored = \
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
+            sample[-1, ...] = sample_zscored[-1, ...]
+
         sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 

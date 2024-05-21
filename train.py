@@ -122,7 +122,6 @@ def train_subject(subject_data):
     # loss_test, acc_test, auroc_test = trainer.evaluate(model, test_loader)
 
 
-
 def seed_everything(seed_val):
     np.random.seed(seed_val)
     random.seed(seed_val)
