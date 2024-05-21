@@ -27,14 +27,14 @@ class EBG4(Dataset):
             #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]
             # else:
             #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
-            subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
+            subjects = [subject_id for subject_id in range(1, 54) if subject_id != 10]
             print("***** Training On All Available Subject *****")
         else:
             subjects = [pick_subjects]
             print(f"***** Training On Subject {pick_subjects} *****")
 
-        self.baseline_min = -0.5
-        self.baseline_max = -0.2
+        self.baseline_min = -1.0
+        self.baseline_max = -0.6
         self.z_score = z_score
         self.source_data = None
         self.labels = None
@@ -42,6 +42,7 @@ class EBG4(Dataset):
         self.fs = None
         self.time_vec = None
         self.class_weight = None
+        self.modality = modality
 
         for i, subject in enumerate(subjects):
             source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type, fs_new=fs_new)
@@ -140,9 +141,9 @@ class EBG4(Dataset):
             self.class_weight = torch.tensor(class_0_count / class_1_count)
         elif binary:
             # only consider high intensity odors
-            # mask = np.logical_not(np.isin(self.labels.squeeze(), [1, 2, 4]))
-            # self.source_data = self.source_data[mask, ...]
-            # self.labels = self.labels[mask]
+            mask = np.logical_not(np.isin(self.labels.squeeze(), [1, 2, 4]))
+            self.source_data = self.source_data[mask, ...]
+            self.labels = self.labels[mask]
             new_labels = [1. if y == 64 else 0. for y in self.labels]
             self.labels = new_labels
             class_0_count = new_labels.count(0.)
@@ -156,7 +157,13 @@ class EBG4(Dataset):
 
         self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
-        self.data = self.data[..., self.t_min:self.t_max] - self.baseline
+        if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
+            self.data = self.data[..., self.t_min:self.t_max]
+            self.data[:, :-1, :] -= self.baseline[:, :-1, :]
+        elif self.modality == "sniff":
+            self.data = self.data[..., self.t_min:self.t_max]
+        else:
+            self.data = self.data[..., self.t_min:self.t_max] - self.baseline
 
     def __len__(self):
         return len(self.labels)
@@ -165,9 +172,15 @@ class EBG4(Dataset):
         if torch.is_tensor(item):
             item = item.tolist()
         sample = self.data[item, ...]
-        if self.z_score:
+        if self.z_score or self.modality == "sniff":
             sample = \
                 (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
+
+        if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
+            sample_zscored = \
+                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
+            sample[-1, ...] = sample_zscored[-1, ...]
+
         sample = torch.from_numpy(sample)
         return sample, self.labels[item]
 

@@ -16,7 +16,7 @@ class DNNConfig():
             'ebg_transform': None,
             'z_score': False,
             'shuffle_labels': False,
-            'modality': 'eeg',
+            'modality': 'sniff',
             'intensity': False,
             'n_classes': 2,
             'tfr_freqs': np.linspace(20, 100, 160),

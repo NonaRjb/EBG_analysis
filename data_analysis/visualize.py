@@ -2,6 +2,8 @@ import pickle
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import seaborn as sns
+import pandas as pd
 import numpy as np
 from scipy import stats
 import os
@@ -13,8 +15,107 @@ colors = {
     "eeg": '#DDCC77',
     "ebg": '#CC6677',
     "sniff": '#44AA99',
-    "source": '#88CCEE'
+    "source": '#88CCEE',
+    "ebg-sniff": "#59a89c"
 }
+
+np.random.seed(29)
+
+
+def scatterplot(ebg_file, eeg_file, sniff_file, source_file, save_path, model, selected_subjects):
+    # Load data from pickle file
+    with open(ebg_file, 'rb') as file:
+        EBG_data = pickle.load(file)
+    with open(eeg_file, 'rb') as file:
+        EEG_data = pickle.load(file)
+    with open(sniff_file, 'rb') as file:
+        sniff_data = pickle.load(file)
+    with open(source_file, 'rb') as file:
+        source_data = pickle.load(file)
+    subjects = [int(k) for k in EBG_data.keys()]
+    sorted_subjects = sorted(subjects)
+    EBG_data = {str(subject): EBG_data[str(subject)] for subject in sorted_subjects}
+    EEG_data = {str(subject): EEG_data[str(subject)] for subject in sorted_subjects}
+    sniff_data = {str(subject): sniff_data[str(subject)] for subject in sorted_subjects}
+    source_data = {str(subject): source_data[str(subject)] for subject in sorted_subjects}
+
+    n_subjects = len(EBG_data.keys())
+
+    # Calculate mean and standard deviation for each data channel across subjects
+    EBG_means = np.array([np.mean(EBG_data[subject]) for subject in EBG_data.keys()])
+    EBG_mean = EBG_means.mean()
+    EBG_std = EBG_means.std() / np.sqrt(EBG_means.shape[0])
+
+    EEG_means = np.array([np.mean(EEG_data[subject]) for subject in EEG_data.keys()])
+    EEG_mean = EEG_means.mean()
+    EEG_std = EEG_means.std() / np.sqrt(EEG_means.shape[0])
+
+    sniff_means = np.array([np.mean(sniff_data[subject]) for subject in sniff_data.keys()])
+    sniff_mean = sniff_means.mean()
+    sniff_std = sniff_means.std() / np.sqrt(sniff_means.shape[0])
+
+    source_means = np.array([np.mean(source_data[subject]) for subject in source_data.keys()])
+    source_mean = source_means.mean()
+    source_std = source_means.std() / np.sqrt(source_means.shape[0])
+
+    # Calculate overall mean and standard error for each channel
+    mean_performance = np.concatenate((
+        np.expand_dims(EBG_means, axis=1),
+        np.expand_dims(EEG_means, axis=1),
+        np.expand_dims(sniff_means, axis=1),
+        np.expand_dims(source_means, axis=1)
+    ), axis=1)
+    overall_mean = np.array([EBG_mean, EEG_mean, sniff_mean, source_mean])
+    standard_error = np.array([EBG_std, EEG_std, sniff_std, source_std])
+
+    # Calculate the height of the bars (difference from 0.5)
+    bar_heights = overall_mean - 0.5
+
+    # Create a DataFrame for Seaborn
+    channels = ['EBG', 'EEG', 'Sniff', 'Source']
+    x_positions = np.arange(len(channels))  # [0, 1, 2, 3]
+
+    data = {
+        'Subject': np.repeat(np.arange(n_subjects), len(channels)),
+        'Channel': np.tile(channels, n_subjects),
+        'Mean Performance': mean_performance.flatten()
+    }
+    df = pd.DataFrame(data)
+
+    # Add jitter to avoid overlap
+    jitter_strength = 0.2
+    df['Jittered Channel'] = df['Channel'].apply(lambda x: x_positions[channels.index(x)] +
+                                                           np.random.uniform(-jitter_strength, jitter_strength))
+
+    plt.figure(figsize=(8, 6))
+
+    # Add bar plot with error bars centered at 0.5
+    plt.bar(x_positions, bar_heights, yerr=standard_error, color='grey', alpha=0.5, capsize=5, bottom=0.5, width=0.5,
+            zorder=1)
+    # Plot scatter plot with jitter
+    sns.scatterplot(data=df, x='Jittered Channel', y='Mean Performance', edgecolor='black', facecolor='none', s=50,
+                    alpha=0.7, linewidth=1.5, zorder=2)
+
+    # Color circles for selected subjects
+    c = sns.color_palette("muted", len(selected_subjects))  # Generate unique c for selected subjects
+    for i, subject_id in enumerate(selected_subjects):
+        mask = df['Subject'] == subject_id
+        selected_data = df[mask]
+        plt.scatter(selected_data['Jittered Channel'], selected_data['Mean Performance'], color=c[i], edgecolor='black',
+                    linewidth=1.5, s=50, zorder=3)
+
+    # Add bar plot with error bars centered at 0.5
+    # plt.bar(x_positions, bar_heights, yerr=standard_error, color='grey', alpha=0.5, capsize=5, bottom=0.5, width=0.5)
+
+    # Customize the plot
+    plt.xticks(x_positions, channels)
+    plt.xlabel('Data Channels')
+    plt.ylabel('Mean Performance')
+    plt.axhline(0.5, color='grey', linewidth=0.8, linestyle='--')  # Adding a reference line at y=0.5
+    plt.title(f'Mean Performance of {model.capitalize()} Across Data Channels')
+
+    plt.savefig(os.path.join(save_path, f"compare_subjects_{model}.pdf"))
+    plt.show()
 
 
 def horizontal_bar_subject(scores, modality, model, save_path):
@@ -44,6 +145,7 @@ def horizontal_bar_subject(scores, modality, model, save_path):
     ax.grid(which='major', axis='x', linestyle='--', color='0.92', linewidth=0.5, zorder=0)
     plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'],
                loc='lower right')
+    ax.set_xlim(0, 1)
     ax.set_title(f'Average AUC by Subject ({modality.upper()})')
     plt.tight_layout()  # Adjust layout to prevent clippirng of labels
     plt.savefig(os.path.join(save_path, f"auc_bar_plots_{model}_{modality}.pdf"))
@@ -134,6 +236,7 @@ def compare_logreg_c(root_path, save_path, modality):
 
     subjects = os.listdir(root_path)
     best_scores = {}
+    best_params = {}
     best_metric = []
     for subject in subjects:
 
@@ -146,9 +249,11 @@ def compare_logreg_c(root_path, save_path, modality):
                 scores[c] = [i for i in scores[c] if i != 0]
         best_param_subj, best_metric_subj = find_best_param(scores, metric="mean")
         best_scores[subject] = scores[best_param_subj]
+        best_params[subject] = best_param_subj
         print(f"Subject {subject}: maximum auc median = {best_metric_subj}, C = {best_param_subj}")
         best_metric.append(best_metric_subj)
-
+    with open(os.path.join(save_path, f"logreg_best_c_{modality}.pkl"), 'wb') as f:
+        pickle.dump(best_params, f)
     with open(os.path.join(save_path, f"scores_subject_{modality}.pkl"), 'wb') as f:
         pickle.dump(best_scores, f)
 
@@ -270,28 +375,7 @@ def plot_dnn_res(root_path, save_path, modality):
     with open(os.path.join(save_path, f"scores_subjects_eegnet1d_{modality}.pkl"), 'wb') as f:
         pickle.dump(scores, f)
 
-    # Calculate mean performance and standard deviation for each subject
-    mean_performances = {subject: np.mean(performances) for subject, performances in aucs.items()}
-    std_performances = {subject: np.std(performances) for subject, performances in aucs.items()}
-
-    # Sort subjects based on mean performance
-    sorted_subjects = sorted(mean_performances, key=mean_performances.get)
-    sorted_mean_performances = [mean_performances[subject] for subject in sorted_subjects]
-    sorted_std_performances = [std_performances[subject] for subject in sorted_subjects]
-
-    # Plotting
-    fig, ax = plt.subplots(figsize=(10, 10))  # Adjust size as needed
-    y = np.arange(len(aucs))
-    bars = ax.barh(y, sorted_mean_performances, xerr=sorted_std_performances, capsize=3, color=colors[modality])
-    ax.axvline(x=0.5, color='red', linestyle='--')
-    ax.set_yticks(y)
-    ax.set_yticklabels(sorted_subjects)
-    ax.set_xlabel('AUC-ROC')
-    plt.legend([bars[0], plt.Line2D([0], [0], color='red', linestyle='--')], ['Performance', 'Chance'])
-    ax.set_title('Sorted Average Performance by Subject (EBG)')
-    plt.tight_layout()  # Adjust layout to prevent clipping of labels
-    plt.savefig(os.path.join(save_path, f"auc_bar_plots_eegnet1d_c_{modality}.pdf"))
-    plt.close()
+    horizontal_bar_subject(scores, modality, "eegnet1d", save_path)
 
     epoch_vals = epochs.values()
     epoch_keys = epochs.keys()
@@ -634,20 +718,20 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
 
 
 if __name__ == "__main__":
-    task = "compare_logreg_c_tmin"
+    task = "subject_modality_scatter_logreg"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6_plots/"
-        compare_logreg_c(path_to_data, path_to_save, "eeg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_source/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_source_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "source")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "sniff")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_ebg-sniff/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_ebg-sniff_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "ebg-sniff")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
@@ -656,9 +740,9 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/compare_models"
         compare_models(path_to_save)
     elif task == "compare_logreg_c_tmin":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_ebg_logratio_-1.0_-0.6/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_ebg_logratio_-1.0_-0.6_plots/"
-        compare_logreg_c_tmin(path_to_data, path_to_save, "ebg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_source_logratio_-1.0_-0.6/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_source_logratio_-1.0_-0.6_plots/"
+        compare_logreg_c_tmin(path_to_data, path_to_save, "source")
     elif task == "compare_logreg_c_sniff":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/sniff_-0.5_1.5_plots"
@@ -695,3 +779,25 @@ if __name__ == "__main__":
         path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_eegnet1d_sniff_plots/scores_subjects_eegnet1d_sniff.pkl"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         compare_subjects(path_to_ebg, path_to_eeg, path_to_sniff, path_to_save, model="eegnet1d")
+    elif task == "subject_modality_scatter_logreg":
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_bl_-1.0_-0.6_plots/" \
+                      "scores_subject_eeg.pkl"
+        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_bl_-1.0_-0.6_plots/" \
+                      "scores_subject_ebg.pkl"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff_-0.5_1.5_plots/" \
+                        "scores_subject_sniff.pkl"
+        path_to_source = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_source_plots/" \
+                         "scores_subject_source.pkl"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg"
+        scatterplot(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_save, "logreg", [4, 10, 13, 35])
+    elif task == "subject_modality_scatter_eegnet1d":
+        path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl_plots/" \
+                      "scores_subjects_eegnet1d_eeg.pkl"
+        path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl_plots/" \
+                      "scores_subjects_eegnet1d_eeg.pkl"
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_sniff_bl_plots/" \
+                        "scores_subjects_eegnet1d_sniff.pkl"
+        path_to_source = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_plots/" \
+                         "scores_subjects_eegnet1d_source.pkl"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn"
+        scatterplot(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_save, "eegnet1d", [4, 10, 13, 35])
