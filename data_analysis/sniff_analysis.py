@@ -36,20 +36,23 @@ def parse_args():
 if __name__ == "__main__":
 
     loc = "remote"
+
+    args = parse_args()
+
     if loc == "local":
         data_path = local_data_path
         save_path = local_save_path
     else:
         data_path = cluster_data_path
         save_path = cluster_save_path
+    
     data_path = os.path.join(data_path, "ebg4")
     save_path = os.path.join(save_path, "plots")
-    save_path = os.path.join(save_path, "grid_search_c")
+    save_path = os.path.join(save_path, "grid_search_c" if args.w is None else "grid_search_c_tmin")
     os.makedirs(save_path, exist_ok=True)
     save_path = os.path.join(save_path, "sniff")
     os.makedirs(save_path, exist_ok=True)
     
-    args = parse_args()
     seed = args.seed
     c = args.c
     if args.subject_id == -1:
@@ -68,7 +71,13 @@ if __name__ == "__main__":
                 data_type="sniff",
                 fs_new=200
             )
-            data_sniff_cropped = crop_temporal(data_sniff, tmin=args.tmin, tmax=args.tmax, tvec=times_sniff)
+            # only consider high intensity labels
+            labels_sniff = np.array(labels_sniff)
+            mask = np.logical_not(np.isin(labels_sniff.squeeze(), [1, 2, 4]))
+            data_sniff = data_sniff[mask, ...]
+            labels_sniff = labels_sniff[mask]
+            # consider both low and high intensity labels
+            data_sniff_cropped = crop_temporal(data_sniff, tmin=args.tmin, tmax=args.tmax, tvec=times_sniff, w=args.w)
             new_labels = [1. if y == 64 else 0. for y in labels_sniff]
             labels_sniff = np.asarray(new_labels)
 
@@ -98,19 +107,19 @@ if __name__ == "__main__":
                 unique_test, counts_test = np.unique(y_test, return_counts=True)
 
                 print(f"Fold {fold + 1}:")
-                print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
-                print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
 
                 clf = clf.fit(X_train, y_train)
                 prob_scores = clf.predict_proba(X_test)[:, 1]
                 auc_score = roc_auc_score(y_test, prob_scores, average='weighted')
                 scores[str(subject)].append(auc_score)
+                print("auc score = ", auc_score)
 
+            print("Average AUC score = ", np.asarray(scores[str(subject)]).mean)            
             if args.save is True:
                 print("Saving the AUC Scores")
                 os.makedirs(os.path.join(save_path, str(subject)), exist_ok=True)
                 np.save(
-                    os.path.join(save_path, str(subject), f"c{c}.npy"),
+                    os.path.join(save_path, str(subject), f"c{c}.npy" if args.w is None else f"c{c}_t{args.tmin}.npy"),
                     np.asarray(scores[str(subject)])
                 )
 

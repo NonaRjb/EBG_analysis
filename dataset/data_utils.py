@@ -226,15 +226,23 @@ def load_ebg4_sniff_mat(path, save_path):
     return
 
 
-def crop_temporal(data, tmin, tmax, tvec):
+def crop_temporal(data, tmin, tmax, tvec, w=None, fs=512):
     if tmin is None:
         t_min = 0
     else:
         t_min = np.abs(tvec - tmin).argmin()
-    if tmax is None:
-        t_max = len(tvec)
+
+    if w is None:
+        if tmax is None:
+            t_max = len(tvec)
+        else:
+            t_max = np.abs(tvec - tmax).argmin()
     else:
-        t_max = np.abs(tvec - tmax).argmin()
+        if tmin is None:
+            t_max = int(w * fs)
+        else:
+            tmax = tmin + w
+            t_max = np.abs(tvec - tmax).argmin()
     return data[..., t_min:t_max]
 
 

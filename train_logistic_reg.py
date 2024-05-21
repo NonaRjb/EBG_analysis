@@ -315,13 +315,17 @@ if __name__ == "__main__":
                            tmin=args.tmin, tmax=args.tmax,
                            fmin=args.fmin, fmax=args.fmax,
                            tvec=t, freqs=freqs,
-                           w=w)
+                           w=w,
+                           fs=256)
             
             n_trials = tfr.shape[0]
             n_time_samples = tfr.shape[-1]
 
             if args.data_type == "source":
                 collapsed_tfr_mean = tfr.reshape((n_trials, 4, 12, 5, n_time_samples))
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+            elif args.modality == "eeg":
+                collapsed_tfr_mean = tfr.reshape((n_trials, 63, 12, 5, n_time_samples))
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
             else:
                 # take the mean over channels
