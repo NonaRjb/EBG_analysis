@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class DNNConfig():
+class DNNConfig:
     def __init__(self):
         self.data_constants = {
             'tmin': -0.1,
@@ -16,7 +16,7 @@ class DNNConfig():
             'ebg_transform': None,
             'normalize': False,
             'shuffle_labels': False,
-            'modality': 'ebg-sniff',
+            'modality': 'source-sniff',
             'intensity': False,
             'n_classes': 2,
             'tfr_freqs': np.linspace(20, 100, 160),

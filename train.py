@@ -194,7 +194,7 @@ def main():
     constants.data_constants['tmax'] = args.tmax
     constants.data_constants['w'] = args.w
     constants.data_constants['ebg_transform'] = args.ebg_transform
-    if "source" in args.data:
+    if constants.data_constants['modality'] == "source":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 4
@@ -206,11 +206,11 @@ def main():
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 63
-    elif constants.data_constants['modality'] == "ebg-sniff":
+    elif constants.data_constants['modality'] in ["ebg-sniff", "sniff-ebg"]:
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 5
-    elif constants.data_constants['modality'] == "eeg-sniff":
+    elif constants.data_constants['modality'] in ["eeg-sniff", "sniff-eeg"]:
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 64
@@ -222,10 +222,24 @@ def main():
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 1
-    else:
+    elif constants.data_constants['modality'] in ['source-sniff', 'sniff-source']:
+        for key in constants.model_constants.keys():
+            if "n_channels" in constants.model_constants[key].keys():
+                constants.model_constants[key]['n_channels'] = 5
+    elif constants.data_constants['modality'] in ['source-ebg', 'ebg-source']:
+        for key in constants.model_constants.keys():
+            if "n_channels" in constants.model_constants[key].keys():
+                constants.model_constants[key]['n_channels'] = 8
+    elif constants.data_constants['modality'] in ['source-eeg', 'eeg-source']:
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
                 constants.model_constants[key]['n_channels'] = 67
+    elif constants.data_constants['modality'] in ['eeg-ebg', 'ebg-eeg']:
+        for key in constants.model_constants.keys():
+            if "n_channels" in constants.model_constants[key].keys():
+                constants.model_constants[key]['n_channels'] = 67
+    else:
+        raise NotImplementedError
     # load a sample subject's data to compute the number of time samples
     _, _, n_time_samples = load_data.load(
         dataset_name=dataset_name,
