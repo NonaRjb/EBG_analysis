@@ -84,6 +84,9 @@ def extract_features(data, times, feature_type, **kwargs):
         if kwargs['modality'] == "source":
             collapsed_tfr_mean = tfr.reshape((n_trials, 4, 12, 5, n_time_samples))
             tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+        elif kwargs['modality'] == "eeg":
+                collapsed_tfr_mean = tfr.reshape((n_trials, 63, 12, 5, n_time_samples))
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
         else:
             # take the mean over channels
             tfr_mean = tfr.mean(axis=1).squeeze()
@@ -278,7 +281,8 @@ def parse_args():
     parser.add_argument('-w', type=float, default=None)
     parser.add_argument('--fmin', type=float, default=20)
     parser.add_argument('--fmax', type=float, default=100)
-    parser.add_argument('-c', type=float, default=1.0)
+    parser.add_argument('--c1', type=float, default=1.0)
+    parser.add_argument('--c2', type=float, default=1.0)
     parser.add_argument('--modality1', type=str, default="ebg")
     parser.add_argument('--modality2', type=str, default="sniff")
     parser.add_argument('--model', type=str, default='logreg')
@@ -301,7 +305,8 @@ if __name__ == "__main__":
 
     dataset_name = args.data
     seed = args.seed
-    c = args.c
+    c1 = args.c1
+    c2 = args.c2
     w = args.w
     modality1 = args.modality1
     modality2 = args.modality2
@@ -309,15 +314,11 @@ if __name__ == "__main__":
     for k in model_kwargs.keys():
         if 'random_state' in model_kwargs[k].keys():
             model_kwargs[k]['random_state'] = seed
-        if 'C' in model_kwargs[k].keys():
-            model_kwargs[k]['C'] = c
-        if 'alpha' in model_kwargs[k].keys():
-            model_kwargs[k]['alpha'] = c
 
-    with open(os.path.join(os.path.join(save_path, f"logreg_best_c_{modality1}.pkl")), 'rb') as f:
-        best_c_mod1 = pickle.load(f)
-    with open(os.path.join(os.path.join(save_path, f"logreg_best_c_{modality2}.pkl")), 'rb') as f:
-        best_c_mod2 = pickle.load(f)
+    # with open(os.path.join(os.path.join(save_path, f"logreg_best_c_{modality1}.pkl")), 'rb') as f:
+    #     best_c_mod1 = pickle.load(f)
+    # with open(os.path.join(os.path.join(save_path, f"logreg_best_c_{modality2}.pkl")), 'rb') as f:
+    #     best_c_mod2 = pickle.load(f)
 
     save_path = os.path.join(save_path, "plots")
     save_path = os.path.join(save_path, "grid_search_c" if w is None else "grid_search_c_tmin")
@@ -390,9 +391,9 @@ if __name__ == "__main__":
         aucpr_scores = []
         for fold, (train_index, test_index) in enumerate(skf.split(mod1_features, y)):
 
-            model_kwargs['logreg']['C'] = float(best_c_mod1[str(subj)])
+            model_kwargs['logreg']['C'] = c1 # float(best_c_mod1[str(subj)])
             clf1 = load_ml_model(model_name=args.model, **model_kwargs[args.model])
-            model_kwargs['logreg']['C'] = float(best_c_mod2[str(subj)])
+            model_kwargs['logreg']['C'] = c2 # float(best_c_mod2[str(subj)])
             clf2 = load_ml_model(model_name=args.model, **model_kwargs[args.model])
 
             X1_train, X1_test = mod1_features[train_index], mod1_features[test_index]
@@ -422,7 +423,7 @@ if __name__ == "__main__":
             print("Saving the AUC Scores")
             os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
             np.save(
-                os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy") if w is not None else os.path.join(
-                    save_path, str(subj), f"{c}.npy"),
+                os.path.join(save_path, str(subj), f"{c1}_{c2}_t{args.tmin}.npy") if w is not None else os.path.join(
+                    save_path, str(subj), f"{c1}_{c2}.npy"),
                 np.asarray(aucroc_scores[str(subj)])
             )
