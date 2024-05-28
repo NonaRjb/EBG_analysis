@@ -99,6 +99,10 @@ def extract_features(data, times, feature_type, **kwargs):
     elif feature_type == "raw_temporal":
         data_cropped = crop_temporal(data, kwargs['tmin'], kwargs['tmax'], times)
 
+        if kwargs['modality'] == "sniff":
+            percentile_95 = np.percentile(np.abs(data_cropped), 95, axis=-1, keepdims=True)
+            data_cropped /= percentile_95
+
         return data_cropped
 
 
@@ -325,12 +329,16 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
     save_path = os.path.join(save_path, dataset_name + "_" + args.model + "_" + modality1 + "_" + modality2)
     os.makedirs(save_path, exist_ok=True)
+    splits_path = os.path.join(data_path, "splits_"+dataset_name)
     data_path = os.path.join(data_path, dataset_name)
 
     if dataset_name == "ebg1":
         subject_ids = [i for i in range(1, 31) if i != 4]
     elif dataset_name == "ebg4":
-        subject_ids = [i for i in range(1, 54) if i != 10]
+        if modality1 == "source" or modality2 == "source":
+            subject_ids = [i for i in range(1, 54) if i not in [10, 3]]
+        else:
+            subject_ids = [i for i in range(1, 54) if i != 10]
     else:
         raise NotImplementedError
 
@@ -386,10 +394,17 @@ if __name__ == "__main__":
 
         y = np.asarray(labels_array)
 
-        skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
+        # skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
         aucroc_scores[str(subj)] = []
         aucpr_scores = []
-        for fold, (train_index, test_index) in enumerate(skf.split(mod1_features, y)):
+
+        # for fold, (train_index, test_index) in enumerate(skf.split(mod1_features, y)):
+        for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subj)))):
+
+            with open(os.path.join(splits_path, str(subj), fold), 'rb') as f:
+                split = pickle.load(f)
+            train_index = split['train']
+            test_index = split['val']
 
             model_kwargs['logreg']['C'] = c1 # float(best_c_mod1[str(subj)])
             clf1 = load_ml_model(model_name=args.model, **model_kwargs[args.model])
@@ -400,7 +415,8 @@ if __name__ == "__main__":
             X2_train, X2_test = mod2_features[train_index], mod2_features[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            print(f"Fold {fold + 1}:")
+            # print(f"Fold {fold + 1}:")
+            print(f"Fold {i + 1}:")
             clf1 = clf1.fit(X1_train, y_train)
             clf2 = clf2.fit(X2_train, y_train)
 

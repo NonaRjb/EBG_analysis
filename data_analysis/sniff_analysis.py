@@ -11,6 +11,7 @@ from sklearn.metrics import confusion_matrix, roc_auc_score
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+import pickle
 import os
 
 from dataset.data_utils import load_ebg4, crop_temporal
@@ -46,6 +47,7 @@ if __name__ == "__main__":
         data_path = cluster_data_path
         save_path = cluster_save_path
     
+    splits_path = os.path.join(data_path, "splits_ebg4")
     data_path = os.path.join(data_path, "ebg4")
     save_path = os.path.join(save_path, "plots")
     save_path = os.path.join(save_path, "grid_search_c" if args.w is None else "grid_search_c_tmin")
@@ -81,32 +83,33 @@ if __name__ == "__main__":
             new_labels = [1. if y == 64 else 0. for y in labels_sniff]
             labels_sniff = np.asarray(new_labels)
 
-            skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
+            percentile_95 = np.percentile(np.abs(data_sniff_cropped), 95, axis=-1, keepdims=True)
+            data_sniff_cropped /= percentile_95
+
+            # skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             scores[str(subject)] = []
-            for fold, (train_idx, test_idx) in enumerate(skf.split(data_sniff_cropped, labels_sniff)):
+            # for fold, (train_idx, test_idx) in enumerate(skf.split(data_sniff_cropped, labels_sniff)):
+            for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subject)))):
+
+                with open(os.path.join(splits_path, str(subject), fold), 'rb') as f:
+                    split = pickle.load(f)
+                train_idx = split['train']
+                test_idx = split['val']
+
                 X_train, y_train = data_sniff_cropped[train_idx], labels_sniff[train_idx]
                 X_test, y_test = data_sniff_cropped[test_idx], labels_sniff[test_idx]
 
-                clf = make_pipeline(StandardScaler(),
+                clf = make_pipeline(# StandardScaler(),
                                     LogisticRegression(C=c, penalty='l1', solver='liblinear',  # l1_ratio=0.5,
                                                        max_iter=2000,
                                                        random_state=seed))
-                # clf = make_pipeline(  # StandardScaler(),
-                #     csp,
-                #     LinearDiscriminantAnalysis())
-                # clf = make_pipeline(StandardScaler(),
-                #                     SVC(C=0.8,
-                #                         kernel='linear',
-                #                         degree=3,
-                #                         probability=True,
-                #                         class_weight='balanced',
-                #                         random_state=seed))
 
                 # Count samples from each class in train and test sets
                 unique_train, counts_train = np.unique(y_train, return_counts=True)
                 unique_test, counts_test = np.unique(y_test, return_counts=True)
 
-                print(f"Fold {fold + 1}:")
+                # print(f"Fold {fold + 1}:")
+                print(f"Fold {i + 1}:")
 
                 clf = clf.fit(X_train, y_train)
                 prob_scores = clf.predict_proba(X_test)[:, 1]
@@ -122,13 +125,3 @@ if __name__ == "__main__":
                     os.path.join(save_path, str(subject), f"c{c}.npy" if args.w is None else f"c{c}_t{args.tmin}.npy"),
                     np.asarray(scores[str(subject)])
                 )
-
-        # score_values = scores.values()
-        # score_keys = scores.keys()
-        # plt.figure(figsize=(40, 6))
-        # plt.boxplot(score_values, labels=score_keys)
-        # plt.title('Boxplot of AUC Scores for Each Subject ')
-        # plt.xlabel('Subject ID')
-        # plt.ylabel('AUC Score')
-        # plt.axhline(y=0.5, color='r', linestyle='--')
-        # plt.show()

@@ -280,6 +280,7 @@ if __name__ == "__main__":
         save_path = os.path.join(save_path, dataset_name+"_"+args.data_type+"_"+args.model)
     
     os.makedirs(save_path, exist_ok=True)
+    splits_path = os.path.join(data_path, "splits_"+dataset_name)
     data_path = os.path.join(data_path, dataset_name)
 
     if args.subject_id == 0:
@@ -346,7 +347,14 @@ if __name__ == "__main__":
             skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             aucroc_scores[str(subj)] = []
             aucpr_scores = []
-            for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
+            # for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
+            for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subj)))):
+
+                with open(os.path.join(splits_path, str(subj), fold), 'rb') as f:
+                    split = pickle.load(f)
+                train_index = split['train']
+                test_index = split['val']
+
                 clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
                 
                 X_train, X_test = X[train_index], X[test_index]
@@ -358,7 +366,8 @@ if __name__ == "__main__":
                 unique_train, counts_train = np.unique(y_train, return_counts=True)
                 unique_test, counts_test = np.unique(y_test, return_counts=True)
 
-                print(f"Fold {fold + 1}:")
+                # print(f"Fold {fold + 1}:")
+                print(f"Fold {i + 1}:")
                 # print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
                 # print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
 
