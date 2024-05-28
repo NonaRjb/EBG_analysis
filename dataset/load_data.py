@@ -34,7 +34,7 @@ def load(dataset_name: str, path: str, batch_size: int, subject_id: int, seed: i
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],
                     data_type="source", intensity=kwargs['intensity'], normalize=kwargs['normalize'],
-                    pick_subjects=subject_id)
+                    pick_subjects=subject_id, modality=kwargs['modality'])
     elif dataset_name == 'ebg4_sensor':
         path = os.path.join(path, "ebg4")
         data = EBG4(root_path=path, tmin=kwargs["tmin"], tmax=kwargs['tmax'], w=kwargs['w'], binary=kwargs['binary'],

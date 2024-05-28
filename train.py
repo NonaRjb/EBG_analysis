@@ -71,6 +71,7 @@ def train_subject(subject_data):
     print(f"Training on {constants.data_constants['n_classes']} classes")
 
     train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
+
     metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': []}
     model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
     print(model)
@@ -114,12 +115,6 @@ def train_subject(subject_data):
     with open(os.path.join(paths['save_path'], f'{split_seed}.pkl'),
               'wb') as f:
         pickle.dump(metrics, f)
-    
-    # wandb.finish()
-    # with open(os.path.join(paths['save_path'], f'{eeg_enc_name}_{batch_size}_{lr}_{epochs}_{optim_name}.pkl'),
-    #           'wb') as f:
-    #     pickle.dump(metrics, f)
-    # loss_test, acc_test, auroc_test = trainer.evaluate(model, test_loader)
 
 
 def seed_everything(seed_val):
@@ -161,6 +156,7 @@ def main():
     wandb.init(project="EBG_Olfaction", config=args)
         # with wandb.init():
     # args = wandb.config
+    constants = DNNConfig()
     eeg_enc_name = args.eeg
     epochs = args.epoch
     seed = args.seed
@@ -171,7 +167,10 @@ def main():
         subject_ids = [args.subject_id]
     else:
         if 'ebg4' in dataset_name:
-            subject_ids = [i for i in range(1, 54) if i != 10]
+            if 'source' in dataset_name or 'source' in constants.data_constants['modality']:
+                subject_ids = [i for i in range(1, 54) if i not in [3, 10]]
+            else:
+                subject_ids = [i for i in range(1, 54) if i != 10]
         elif 'ebg1' in dataset_name:
             subject_ids = [i for i in range(1, 31) if i != 4]
         else:
@@ -180,15 +179,14 @@ def main():
     print("device = ", device)
     # if dataset_name == 'ebg3_tfr':
     #     local_data_path = '/Users/nonarajabi/Desktop/KTH/Smell/paper3/TFRs/'
-    constants = DNNConfig()
     main_paths = {
         "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
         "save_path": cluster_save_path if device == 'cuda' else local_save_path
     }
-    if "source" not in args.data:
-        directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
-    else:
+    if constants.data_constants['modality'] == "source":
         directory_name = f"{dataset_name}_{eeg_enc_name}"
+    else:
+        directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
     os.makedirs(os.path.join(main_paths['save_path'], directory_name), exist_ok=True)
     constants.data_constants['tmin'] = args.tmin
     constants.data_constants['tmax'] = args.tmax

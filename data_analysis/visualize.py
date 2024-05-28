@@ -53,19 +53,22 @@ def scatterplot_multimodal(
     subjects = [int(k) for k in EBG_data.keys()]
     sorted_subjects = sorted(subjects)
 
-    def sort_data(data):
-        return {str(subject): data[str(subject)] for subject in sorted_subjects}
+    subjects_source = [int(k) for k in source_sniff_data.keys()]
+    sorted_subjects_source = sorted(subjects_source)
 
-    EBG_data = sort_data(EBG_data)
-    EEG_data = sort_data(EEG_data)
-    sniff_data = sort_data(sniff_data)
-    source_data = sort_data(source_data)
-    EBG_sniff_data = sort_data(EBG_sniff_data)
-    EEG_sniff_data = sort_data(EEG_sniff_data)
-    source_sniff_data = sort_data(source_sniff_data)
-    EEG_EBG_data = sort_data(EEG_EBG_data)
-    source_EBG_data = sort_data(source_EBG_data)
-    EEG_source_data = sort_data(EEG_source_data)
+    def sort_data(data, subjects_sorted):
+        return {str(subject): data[str(subject)] for subject in subjects_sorted}
+
+    EBG_data = sort_data(EBG_data, sorted_subjects)
+    EEG_data = sort_data(EEG_data, sorted_subjects)
+    sniff_data = sort_data(sniff_data, sorted_subjects)
+    source_data = sort_data(source_data, sorted_subjects)
+    EBG_sniff_data = sort_data(EBG_sniff_data, sorted_subjects)
+    EEG_sniff_data = sort_data(EEG_sniff_data, sorted_subjects)
+    source_sniff_data = sort_data(source_sniff_data, sorted_subjects_source)
+    EEG_EBG_data = sort_data(EEG_EBG_data, sorted_subjects)
+    source_EBG_data = sort_data(source_EBG_data, sorted_subjects_source)
+    EEG_source_data = sort_data(EEG_source_data, sorted_subjects_source)
 
     # Calculate means and standard errors
     def calc_mean_and_se(data):
@@ -119,7 +122,7 @@ def scatterplot_multimodal(
     # Add bar plot with error bars centered at 0.5
     dist_scale = 1.5
     bar_positions = np.arange(0, len(combined_categories), 3) * dist_scale
-    bar_positions_all = [[dist_scale * i, dist_scale * i + 0.7, dist_scale * i + 1.4] for i in
+    bar_positions_all = [[dist_scale * i, dist_scale * i + 0.8, dist_scale * i + 1.6] for i in
                          np.arange(0, len(combined_categories), 3)]
     bar_positions_all = np.array([i for x in bar_positions_all for i in x])
 
@@ -131,35 +134,36 @@ def scatterplot_multimodal(
     plt.gca().yaxis.set_major_locator(ticker.MultipleLocator(0.05))
 
     plt.bar(bar_positions_all[0], means[0] - 0.5, yerr=errors[0], color=colors['ebg-sniff'], alpha=0.7, capsize=3,
-            bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[3], means[3] - 0.5, yerr=errors[3], color=colors['eeg-ebg'], alpha=0.7, capsize=3,
-            bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[6], means[6] - 0.5, yerr=errors[6], color=colors['source-ebg'], alpha=0.7, capsize=3,
-            bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[9], means[9] - 0.5, yerr=errors[9], color=colors['source-eeg'], alpha=0.7, capsize=3,
-            bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[12], means[12] - 0.5, yerr=errors[12], color=colors['eeg-sniff'], alpha=0.7, capsize=3,
-            bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[15], means[15] - 0.5, yerr=errors[15], color=colors['source-sniff'], alpha=0.7, capsize=3,
-            bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[[1, 5, 8]], means[[1, 5, 8]] - 0.5, yerr=errors[[1, 5, 8]],
-            color=colors['ebg'], alpha=0.7, capsize=3, bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            color=colors['ebg'], alpha=0.7, capsize=3, bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[[2, 14, 17]], means[[2, 14, 17]] - 0.5, yerr=errors[[2, 14, 17]],
-            color=colors['sniff'], alpha=0.7, capsize=3, bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            color=colors['sniff'], alpha=0.7, capsize=3, bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[[4, 10, 13]], means[[4, 10, 13]] - 0.5, yerr=errors[[4, 10, 13]],
-            color=colors['eeg'], alpha=0.7, capsize=3, bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            color=colors['eeg'], alpha=0.7, capsize=3, bottom=0.5, width=0.8, zorder=1, edgecolor='black')
     plt.bar(bar_positions_all[[7, 11, 16]], means[[7, 11, 16]] - 0.5, yerr=errors[[7, 11, 16]],
-            color=colors['source'], alpha=0.7, capsize=3, bottom=0.5, width=0.5, zorder=1, edgecolor='black')
+            color=colors['source'], alpha=0.7, capsize=3, bottom=0.5, width=0.8, zorder=1, edgecolor='black')
 
     # Customize the plot
     plt.xticks(bar_positions_all, combined_categories, rotation=45, ha='right')
-    plt.xlabel('Data Modalities')
-    plt.ylabel('Mean Performance')
+    plt.tick_params(axis='both', which='major', labelsize=13)
+    plt.xlabel('Data Modalities', fontsize=15)
+    plt.ylabel('Mean Performance', fontsize=15)
     plt.ylim((0.5, 1.0))
-    plt.title(f'Mean Performance of {model.capitalize()} Across Data Modalities')
+    plt.title(f'Mean Performance of {model.capitalize()} Across Data Modalities', fontsize=16)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, f"compare_subjects_multimodal_{model}.pdf"))
+    plt.savefig(os.path.join(save_path, f"compare_subjects_multimodal_{model}.svg"))
     plt.show()
 
 
@@ -598,7 +602,10 @@ def find_best_param(data_dict, metric="median"):
 
 
 def plot_dnn_res(root_path, save_path, modality):
-    subjects = [i for i in range(1, 54) if i != 10]
+
+    subjects = os.listdir(root_path)
+    subjects = [int(s) for s in subjects]
+    subjects.sort()
     aucs = {}
     epochs = {}
     metrics = []
@@ -958,20 +965,20 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
 
 
 if __name__ == "__main__":
-    task = "plot_dnn_res"
+    task = "compare_logreg_c"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_logreg_eeg_sniff/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_logreg_eeg_sniff_plots/"
-        compare_logreg_c(path_to_data, path_to_save, "eeg-sniff")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "sniff")
     elif task == "plot_logreg_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_tmin/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg-ebg/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg-ebg_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "eeg-ebg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-sniff/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-sniff_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "source-sniff")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
@@ -1068,9 +1075,12 @@ if __name__ == "__main__":
                             "scores_subject_ebg-sniff.pkl"
         path_to_eeg_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_logreg_eeg_sniff_plots/" \
                             "scores_subject_eeg-sniff.pkl"
-        path_to_source_sniff = path_to_ebg_sniff
-        path_to_eeg_ebg = path_to_ebg_sniff
-        path_to_source_ebg = path_to_ebg_sniff
+        path_to_source_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_logreg_source_sniff_plots/" \
+                               "scores_subject_source-sniff.pkl"
+        path_to_eeg_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_logreg_eeg_ebg_plots/" \
+                          "scores_subject_eeg-ebg.pkl"
+        path_to_source_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_logreg_source_ebg_plots/" \
+                             "scores_subject_source-ebg.pkl"
         path_to_eeg_source = path_to_ebg_sniff
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg"
         scatterplot_multimodal(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_ebg_sniff,
@@ -1091,7 +1101,8 @@ if __name__ == "__main__":
                             "scores_subjects_eegnet1d_ebg-sniff.pkl"
         path_to_eeg_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg-sniff_plots/" \
                             "scores_subjects_eegnet1d_eeg-sniff.pkl"
-        path_to_source_sniff = path_to_ebg_sniff
+        path_to_source_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-sniff_plots/" \
+                               "scores_subjects_eegnet1d_source-sniff.pkl"
         path_to_eeg_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg-ebg_plots/" \
                           "scores_subjects_eegnet1d_eeg-ebg.pkl"
         path_to_source_ebg = path_to_ebg_sniff
