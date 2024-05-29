@@ -335,10 +335,7 @@ if __name__ == "__main__":
     if dataset_name == "ebg1":
         subject_ids = [i for i in range(1, 31) if i != 4]
     elif dataset_name == "ebg4":
-        if modality1 == "source" or modality2 == "source":
-            subject_ids = [i for i in range(1, 54) if i not in [10, 3]]
-        else:
-            subject_ids = [i for i in range(1, 54) if i != 10]
+        subject_ids = [i for i in range(1, 54) if i != 10]
     else:
         raise NotImplementedError
 
