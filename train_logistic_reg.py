@@ -344,7 +344,7 @@ if __name__ == "__main__":
 
             csp = CSP(n_components=4, reg=1e-05, log=None, transform_into='average_power', norm_trace=False)
 
-            skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
+            # skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
             aucroc_scores[str(subj)] = []
             aucpr_scores = []
             # for fold, (train_index, test_index) in enumerate(skf.split(X, y)):

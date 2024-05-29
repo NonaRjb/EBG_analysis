@@ -158,6 +158,7 @@ def load_source_ebg4(filename):
     print(f"********** loading source data from {filename} **********")
 
     mat73_files = [i for i in range(21, 54)]
+    mat73_files.append(3)
     if int(filename.split("/")[-2]) in mat73_files:
         data_struct = mat73.loadmat(filename)
 
