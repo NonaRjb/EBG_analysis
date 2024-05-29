@@ -16,7 +16,7 @@ class DNNConfig:
             'ebg_transform': None,
             'normalize': False,
             'shuffle_labels': False,
-            'modality': 'sniff',
+            'modality': 'source',
             'intensity': False,
             'n_classes': 2,
             'tfr_freqs': np.linspace(20, 100, 160),
