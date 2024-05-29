@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.multiprocessing import Pool, set_start_method
 from torch.optim import Adam, RMSprop, SGD, AdamW
+from torch.utils.data import DataLoader
 from sklearn.model_selection import RepeatedStratifiedKFold
 import pickle
 import argparse
@@ -29,12 +30,11 @@ def dummy_function(a):
     x1 = torch.randn((10000, 10000)).to("cuda:0")
     while True:
         _ = x1 * x1
-    
+
 
 def train_subject(subject_data):
-
     # wandb.init()
-   
+
     subject, eeg_enc_name, dataset_name, epochs, seed, split_seed, directory_name, device, constants = subject_data
 
     print(f"********** subject {subject} **********")
@@ -44,15 +44,16 @@ def train_subject(subject_data):
     scheduler_name = constants.training_constants['scheduler_name']
     optim_name = constants.training_constants['optim_name']
     batch_size = constants.training_constants['batch_size']
-    
+
     paths = {
-                "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
-                "save_path": cluster_save_path if device == 'cuda' else local_save_path
-            }
+        "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
+        "save_path": cluster_save_path if device == 'cuda' else local_save_path
+    }
+    splits_path = os.path.join(paths['eeg_data'], "splits_ebg4")
     os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject)), exist_ok=True)
     # os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject_id), str(args.tmin)),
     #             exist_ok=True)
-    paths['save_path'] = os.path.join(paths['save_path'], directory_name, str(subject)) # , str(args.tmin))
+    paths['save_path'] = os.path.join(paths['save_path'], directory_name, str(subject))  # , str(args.tmin))
     print(f"Directory '{directory_name}' created.")
     # create_readme(wandb.config, path=paths['save_path']
     # data, weights, n_time_samples = load_data.load(
@@ -70,51 +71,66 @@ def train_subject(subject_data):
     print("EEG sequence length = ", n_time_samples)
     print(f"Training on {constants.data_constants['n_classes']} classes")
 
-    train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
+    # train_loader, val_loader, test_loader = loaders['train_loader'], loaders['val_loader'], loaders['test_loader']
 
-    metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': []}
-    model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
-    print(model)
-    print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
-    model = model.double()
-    if optim_name == 'adam':
-        optim = Adam(model.parameters(), lr, weight_decay=weight_decay)
-    elif optim_name == 'adamw':
-        optim = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=True)
-    elif optim_name == 'rmsprop':
-        optim = RMSprop(model.parameters(), lr=lr, weight_decay=weight_decay)
-    elif optim_name == 'sgd':
-        optim = SGD(model.parameters(), lr=lr, momentum=0.1, weight_decay=weight_decay)
-    else:
-        raise NotImplementedError
-    if scheduler_name == 'plateau':
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=200,
-                                                               min_lr=0.1 * 1e-7,
-                                                               factor=0.1)
-    elif scheduler_name == 'multistep':
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[16, 64, 256],
-                                                         gamma=0.1)
-    elif scheduler_name == 'exp':
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.99, last_epoch=-1)
-    elif scheduler_name == 'linear':
-        scheduler = torch.optim.lr_scheduler.LinearLR(optim, start_factor=1., end_factor=0.5, total_iters=30)
-    elif scheduler_name == 'cosine':
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=0, last_epoch=-1)
-    else:
-        raise NotImplementedError
-    trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs,
-                           n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
-                           weights=None, device=device, scheduler=scheduler)
-    best_model = trainer.train(train_loader, val_loader)
-    metrics['loss'].append(best_model['loss'])
-    metrics['acc'].append(best_model['acc'])
-    metrics['auroc'].append(best_model['auroc'])
-    metrics['epoch'].append(best_model['epoch'])
-    # model.load_state_dict(best_model['model_state_dict'])
-    print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
-    with open(os.path.join(paths['save_path'], f'{split_seed}.pkl'),
-              'wb') as f:
-        pickle.dump(metrics, f)
+    g = torch.Generator().manual_seed(seed)
+    for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subject)))):
+        metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': []}
+        with open(os.path.join(splits_path, str(subject), fold), 'rb') as f:
+            split = pickle.load(f)
+        train_index = split['train']
+        test_index = split['val']
+
+        # Sample elements randomly from a given list of ids, no replacement.
+        train_sub_sampler = torch.utils.data.SubsetRandomSampler(train_index, generator=g)
+        test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_index, generator=g)
+
+        # Create DataLoader for training and validation
+        train_loader = DataLoader(data, batch_size=batch_size, sampler=train_sub_sampler, drop_last=True)
+        val_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
+
+        model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
+        print(model)
+        print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
+        model = model.double()
+        if optim_name == 'adam':
+            optim = Adam(model.parameters(), lr, weight_decay=weight_decay)
+        elif optim_name == 'adamw':
+            optim = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=True)
+        elif optim_name == 'rmsprop':
+            optim = RMSprop(model.parameters(), lr=lr, weight_decay=weight_decay)
+        elif optim_name == 'sgd':
+            optim = SGD(model.parameters(), lr=lr, momentum=0.1, weight_decay=weight_decay)
+        else:
+            raise NotImplementedError
+        if scheduler_name == 'plateau':
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=200,
+                                                                   min_lr=0.1 * 1e-7,
+                                                                   factor=0.1)
+        elif scheduler_name == 'multistep':
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[16, 64, 256],
+                                                             gamma=0.1)
+        elif scheduler_name == 'exp':
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.99, last_epoch=-1)
+        elif scheduler_name == 'linear':
+            scheduler = torch.optim.lr_scheduler.LinearLR(optim, start_factor=1., end_factor=0.5, total_iters=30)
+        elif scheduler_name == 'cosine':
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=0, last_epoch=-1)
+        else:
+            raise NotImplementedError
+        trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs,
+                               n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
+                               weights=None, device=device, scheduler=scheduler)
+        best_model = trainer.train(train_loader, val_loader)
+        metrics['loss'].append(best_model['loss'])
+        metrics['acc'].append(best_model['acc'])
+        metrics['auroc'].append(best_model['auroc'])
+        metrics['epoch'].append(best_model['epoch'])
+        # model.load_state_dict(best_model['model_state_dict'])
+        print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        with open(os.path.join(paths['save_path'], f'{i+1}.pkl'),
+                  'wb') as f:
+            pickle.dump(metrics, f)
 
 
 def seed_everything(seed_val):
@@ -154,7 +170,7 @@ def parse_args():
 def main():
     args = parse_args()
     wandb.init(project="EBG_Olfaction", config=args)
-        # with wandb.init():
+    # with wandb.init():
     # args = wandb.config
     constants = DNNConfig()
     eeg_enc_name = args.eeg
@@ -167,10 +183,7 @@ def main():
         subject_ids = [args.subject_id]
     else:
         if 'ebg4' in dataset_name:
-            if 'source' in dataset_name or 'source' in constants.data_constants['modality']:
-                subject_ids = [i for i in range(1, 54) if i not in [3, 10]]
-            else:
-                subject_ids = [i for i in range(1, 54) if i != 10]
+            subject_ids = [i for i in range(1, 54) if i != 10]
         elif 'ebg1' in dataset_name:
             subject_ids = [i for i in range(1, 31) if i != 4]
         else:
@@ -249,12 +262,13 @@ def main():
         subject_id=1,
         device=device, **constants.data_constants
     )
-    
+
     constants.model_constants['eegnet']['n_samples'] = n_time_samples
     constants.model_constants['eegnet1d']['n_samples'] = n_time_samples
     constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples
     constants.model_constants['resnet1d']['n_samples'] = n_time_samples
-    subject_data_list = [(sid, eeg_enc_name, dataset_name, epochs, seed, split_seed, directory_name, device, constants) for sid in subject_ids] 
+    subject_data_list = [(sid, eeg_enc_name, dataset_name, epochs, seed, split_seed, directory_name, device, constants)
+                         for sid in subject_ids]
     print("number of available CPUs = ", os.cpu_count())
     # num_processes = max(os.cpu_count(), 2)
     # num_processes = 4
@@ -266,7 +280,7 @@ def main():
 
     wandb.finish()
 
-            
+
 if __name__ == "__main__":
     try:
         set_start_method('spawn')
@@ -275,5 +289,5 @@ if __name__ == "__main__":
 
     if torch.cuda.is_available():
         torch.cuda.set_device(0)
-    
+
     main()

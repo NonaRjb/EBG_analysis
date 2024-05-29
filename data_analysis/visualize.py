@@ -965,7 +965,7 @@ def compare_subjects(ebg_file, eeg_file, sniff_file, save_path, model):
 
 
 if __name__ == "__main__":
-    task = "compare_logreg_c"
+    task = "plot_dnn_res"
 
     if task == "compare_logreg_c":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff/"
@@ -976,9 +976,9 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-sniff/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-sniff_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "source-sniff")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_sniff/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_sniff_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "sniff")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/w_results/source_data"
@@ -1056,7 +1056,7 @@ if __name__ == "__main__":
                       "scores_subjects_eegnet1d_eeg.pkl"
         path_to_ebg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_eeg_bl_plots/" \
                       "scores_subjects_eegnet1d_eeg.pkl"
-        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_sniff_95p_bl_plots/" \
+        path_to_sniff = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_sensor_ica_eegnet1d_sniff_plots/" \
                         "scores_subjects_eegnet1d_sniff.pkl"
         path_to_source = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_plots/" \
                          "scores_subjects_eegnet1d_source.pkl"
