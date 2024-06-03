@@ -17,17 +17,17 @@ class EBG4(Dataset):
             modality: str = 'both',
             intensity: bool = False,
             pick_subjects: int = 0,
-            z_score: bool = False,
-            fs_new: int = None
+            normalize: bool = False,
+            fs_new: int = None,
+            transform=None
     ):
 
         self.root_path = root_path
         if pick_subjects == 0:
-            # if data_type != 'source':
-            #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]
-            # else:
-            #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
-            subjects = [subject_id for subject_id in range(1, 54) if subject_id != 10]
+            if data_type == "source" or "source" in modality:
+                subjects = [subject_id for subject_id in range(1, 54) if subject_id not in [10, 3]]
+            else:
+                subjects = [subject_id for subject_id in range(1, 54) if subject_id != 10]
             print("***** Training On All Available Subject *****")
         else:
             subjects = [pick_subjects]
@@ -35,7 +35,7 @@ class EBG4(Dataset):
 
         self.baseline_min = -1.0
         self.baseline_max = -0.6
-        self.z_score = z_score
+        self.normalize = normalize
         self.source_data = None
         self.labels = None
         self.subject_id = None
@@ -43,61 +43,95 @@ class EBG4(Dataset):
         self.time_vec = None
         self.class_weight = None
         self.modality = modality
+        self.transform = transform
 
         for i, subject in enumerate(subjects):
             source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type, fs_new=fs_new)
 
-            if self.fs is None:
-                self.fs = float(fs)
-
-            if self.time_vec is None:
-                self.time_vec = time_vec
-
             if data_type == 'sensor' or data_type == 'sensor_ica':
                 if modality == 'eeg':
                     source_data = source_data[:, :63, :]
-                elif modality == 'eeg-sniff':
+                elif modality == 'eeg-sniff' or modality == 'sniff-eeg':
                     sniff_data, _, _, _ = load_ebg4(
                         root_path,
                         subject,
                         data_type="sniff",
-                        fs_new=fs_new if fs_new is not None else self.fs
+                        fs_new=fs_new if fs_new is not None else fs
                     )
                     sniff_data = np.expand_dims(sniff_data, axis=1)
                     source_data = source_data[:, :63, :]    # extract EEG
                     source_data = np.concatenate((source_data, sniff_data), axis=1)
                 elif modality == 'ebg':
                     source_data = source_data[:, 63:-1, :]
-                elif modality == 'ebg-sniff':
+                elif modality == 'ebg-sniff' or modality == 'sniff-ebg':
                     sniff_data, _, _, _ = load_ebg4(
                         root_path,
                         subject,
                         data_type="sniff",
-                        fs_new=fs_new if fs_new is not None else self.fs
+                        fs_new=fs_new if fs_new is not None else fs
                     )
                     sniff_data = np.expand_dims(sniff_data, axis=1)
                     source_data = source_data[:, 63:-1, :]    # extract EBG
                     source_data = np.concatenate((source_data, sniff_data), axis=1)
+                elif modality == 'eeg-ebg' or modality == 'ebg-eeg':
+                    source_data = source_data[:, :-1, :]
                 elif modality == 'both-sniff':
                     sniff_data, _, _, _ = load_ebg4(
                         root_path,
                         subject,
                         data_type="sniff",
-                        fs_new=fs_new if fs_new is not None else self.fs
+                        fs_new=fs_new if fs_new is not None else fs
                     )
                     sniff_data = np.expand_dims(sniff_data, axis=1)
-                    source_data = np.concatenate((source_data, sniff_data), axis=1)
+                    source_data = np.concatenate((source_data[:, :-1, :], sniff_data), axis=1)
                 elif modality == 'sniff':
                     sniff_data, _, _, _ = load_ebg4(
                         root_path,
                         subject,
                         data_type="sniff",
-                        fs_new=fs_new if fs_new is not None else self.fs
+                        fs_new=fs_new if fs_new is not None else fs
                     )
                     sniff_data = np.expand_dims(sniff_data, axis=1)
                     source_data = sniff_data
+                elif modality == 'source-ebg' or modality == 'ebg-source':
+                    source_activity, _, t_source, _ = load_ebg4(root_path, subject, "source", fs_new=fs_new)
+                    time_vec = t_source
+                    source_data = source_data[:, 63:-1, :len(t_source)]
+                    source_data = np.concatenate((source_data, source_activity), axis=1)
+                elif modality == 'source-eeg' or modality == 'eeg-source':
+                    source_activity, _, t_source, _ = load_ebg4(root_path, subject, "source", fs_new=fs_new)
+                    time_vec = t_source
+                    source_data = source_data[:, :63, :len(t_source)]
+                    source_data = np.concatenate((source_data, source_activity), axis=1)
+                else:
+                    raise NotImplementedError
+            else:   # data type is source
+                if modality == 'source-sniff' or modality == 'sniff-source':
+                    sniff_data, _, _, _ = load_ebg4(
+                        root_path,
+                        subject,
+                        data_type="sniff",
+                        fs_new=fs_new if fs_new is not None else fs
+                    )
+                    sniff_data = sniff_data[..., :len(time_vec)]
+                    sniff_data = np.expand_dims(sniff_data, axis=1)
+                    source_data = np.concatenate((source_data, sniff_data), axis=1)
+                elif modality == 'source-ebg' or modality == 'ebg-source':
+                    sensor_data, _, _, _ = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
+                    sensor_data = sensor_data[:, 63:-1, :len(time_vec)]
+                    source_data = np.concatenate((source_data, sensor_data), axis=1)
+                elif modality == 'source-eeg' or modality == 'eeg-source':
+                    sensor_data, _, _, _ = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
+                    sensor_data = sensor_data[:, :63, :len(time_vec)]
+                    source_data = np.concatenate((source_data, sensor_data), axis=1)
                 else:
                     pass
+
+            if self.fs is None:
+                self.fs = float(fs)
+
+            if self.time_vec is None:
+                self.time_vec = time_vec
 
             if self.source_data is None:
                 self.source_data = source_data
@@ -157,13 +191,9 @@ class EBG4(Dataset):
 
         self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
-        if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
-            self.data = self.data[..., self.t_min:self.t_max]
-            self.data[:, :-1, :] -= self.baseline[:, :-1, :]
-        elif self.modality == "sniff":
-            self.data = self.data[..., self.t_min:self.t_max]
-        else:
-            self.data = self.data[..., self.t_min:self.t_max] - self.baseline
+        self.data = self.data[..., self.t_min:self.t_max] - self.baseline
+        # self.data = np.random.randn(*self.data.shape).astype(np.float64)
+        self.percentile_95 = np.percentile(np.abs(self.data), 95, axis=-1, keepdims=True)
 
     def __len__(self):
         return len(self.labels)
@@ -172,16 +202,15 @@ class EBG4(Dataset):
         if torch.is_tensor(item):
             item = item.tolist()
         sample = self.data[item, ...]
-        if self.z_score or self.modality == "sniff":
-            sample = \
-                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
-
+        if self.normalize or self.modality == "sniff":
+            sample = sample / self.percentile_95[item, ...]
         if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
-            sample_zscored = \
-                (sample - np.mean(sample, axis=-1, keepdims=True)) / (np.std(sample, axis=-1, keepdims=True) + 1e-08)
-            sample[-1, ...] = sample_zscored[-1, ...]
+            sample_normalized = sample / self.percentile_95[item, ...]
+            sample[-1, ...] = sample_normalized[-1, ...]
 
         sample = torch.from_numpy(sample)
+        if self.transform:
+            sample = self.transform(sample)
         return sample, self.labels[item]
 
 

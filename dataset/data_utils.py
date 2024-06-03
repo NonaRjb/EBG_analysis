@@ -159,6 +159,7 @@ def load_source_ebg4(filename):
 
     mat73_files = [i for i in range(21, 54)]
     mat73_files.append(3)
+    print(mat73_files)
     if int(filename.split("/")[-2]) in mat73_files:
         data_struct = mat73.loadmat(filename)
 
@@ -200,7 +201,7 @@ def load_ebg4_sniff(filename, fs_new=None):
 
 
 def load_ebg4_sniff_mat(path, save_path):
-    # Function to load the sniff signal MATLAB struct and split it into per subject signals
+    # Function to load the sniff signal MATLAB struct and split it into per s signals
 
     labels_map = {
         '1-Butanol low  ': 1,
@@ -213,8 +214,8 @@ def load_ebg4_sniff_mat(path, save_path):
     }
     data_struct = scio.loadmat(path)
     data_all = data_struct['data'][0][0]
-    for subject in range(1, 54):
-        data_subject = data_all['subject' + str("{:02d}".format(subject))][0]
+    for s in range(1, 54):
+        data_subject = data_all['subject' + str("{:02d}".format(s))][0]
         trials_subject = data_subject['trials'][0]
         labels_subject = data_subject['odors'][0].squeeze()
         labels_subject = [labels_map[i[0]] for i in labels_subject]
@@ -222,7 +223,7 @@ def load_ebg4_sniff_mat(path, save_path):
             'trials': trials_subject,
             'labels': labels_subject
         }
-        with open(os.path.join(save_path, "s" + str("{:02d}".format(subject)) + "_sniff.pkl"), "wb") as f:
+        with open(os.path.join(save_path, "s" + str("{:02d}".format(s)) + "_sniff.pkl"), "wb") as f:
             pickle.dump(data_dict, f)
     return
 
@@ -375,7 +376,7 @@ class RandomNoise(object):
         if self.p < torch.rand(1):
             return x
         if self.std is None:
-            self.std = x.std(dim=-1, keepdims=True) / 4.
+            self.std = x.std(axis=-1, keepdims=True) / 4.
         if self.mean is None:
             self.mean = x.mean(dim=-1, keepdims=True)
         noise = torch.randn_like(x)
@@ -583,10 +584,32 @@ class MinMaxNormalize:
 
 
 if __name__ == "__main__":
+
     # load_ebg4_sniff_mat("/Volumes/T5 EVO/Smell/ebg4_sniff/trials_all_subjects_ICA_cut.mat",
     #                     "/Volumes/T5 EVO/Smell/ebg4_sniff/ebg4_sniff_subject")
 
     root_path = "/Volumes/T5 EVO/Smell/ebg4"
-    subject = 1
-    data_ebg, labels_ebg, times_ebg, fs_ebg = load_ebg4(root_path, subject, data_type="sensor_ica")
-    data_sniff, labels_sniff, times_sniff, fs_sniff = load_ebg4(root_path, subject, data_type="sniff")
+    # subject = 1
+    # data_ebg, labels_ebg, times_ebg, fs_ebg = load_ebg4(root_path, subject, data_type="sensor_ica")
+    # data_sniff, labels_sniff, times_sniff, fs_sniff = load_ebg4(root_path, subject, data_type="sniff")
+
+    subjects = [i for i in range(1, 54) if i != 10]
+    mismatches = {'sensor_sniff': [], 'source_sniff': [], 'sensor_source': []}
+    for s in subjects:
+        sensor_data, sensor_labels, sensor_time, sensor_fs = \
+            load_ebg4(root=root_path, subject_id=s, data_type="sensor_ica", fs_new=256)
+
+        sniff_data, sniff_labels, sniff_time, sniff_fs = \
+            load_ebg4(root=root_path, subject_id=s, data_type="sniff", fs_new=256)
+
+        source_data, source_labels, source_time, source_fs = \
+            load_ebg4(root=root_path, subject_id=s, data_type="source", fs_new=256)
+
+        if not np.array_equal(sensor_labels, source_labels):
+            mismatches['sensor_source'].append(s)
+        if not np.array_equal(sensor_labels, sniff_labels):
+            mismatches['sensor_sniff'].append(s)
+        if not np.array_equal(source_labels, sniff_labels):
+            mismatches['source_sniff'].append(s)
+
+        # find longest match difflib

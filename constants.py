@@ -11,7 +11,7 @@ data_constants = {
     'train_size': 0.8,
     'val_size': 0.2,
     'ebg_transform': None,
-    'z_score': False,
+    'normalize': False,
     'shuffle_labels': False,
     'modality': 'ebg-sniff',
     'intensity': False,
