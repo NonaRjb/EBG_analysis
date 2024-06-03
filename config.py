@@ -25,6 +25,7 @@ class DNNConfig:
 
         self.training_constants = {
             'scheduler_name': 'plateau',
+            'patience': 20,
             'weight_decay': 0.1,
             'lr': 0.0001,
             'batch_size': 16,

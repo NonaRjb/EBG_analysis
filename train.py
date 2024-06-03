@@ -80,17 +80,17 @@ def train_subject(subject_data):
         device=device, **constants.data_constants
     )
 
-    _, transformed_data, _ = load_data.load(
-        dataset_name=dataset_name,
-        path=paths['eeg_data'],
-        batch_size=batch_size,
-        seed=seed,
-        split_seed=split_seed,
-        augmentation=False,
-        subject_id=subject,
-        transform=data_transforms,
-        device=device, **constants.data_constants
-    )
+    # _, transformed_data, _ = load_data.load(
+    #     dataset_name=dataset_name,
+    #     path=paths['eeg_data'],
+    #     batch_size=batch_size,
+    #     seed=seed,
+    #     split_seed=split_seed,
+    #     augmentation=False,
+    #     subject_id=subject,
+    #     transform=data_transforms,
+    #     device=device, **constants.data_constants
+    # )
 
     # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
     print("EEG sequence length = ", n_time_samples)
@@ -105,23 +105,23 @@ def train_subject(subject_data):
             split = pickle.load(f)
         train_index = split['train']
         val_index = split['val']
-        test_index = split['test']
+        # test_index = split['test']
 
         val_labels = data.labels[val_index]
-        test_labels = data.labels[test_index]
+        # test_labels = data.labels[test_index]
 
-        if np.sum(val_labels == 1) == 0 or np.sum(test_labels == 1) == 0:
+        if np.sum(val_labels == 1) == 0:  # or np.sum(test_labels == 1) == 0:
             continue
 
         # Sample elements randomly from a given list of ids, no replacement.
         train_sub_sampler = torch.utils.data.SubsetRandomSampler(train_index, generator=g)
         val_sub_sampler = torch.utils.data.SubsetRandomSampler(val_index, generator=g)
-        test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_index, generator=g)
+        # test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_index, generator=g)
 
         # Create DataLoader for training and validation
-        train_loader = DataLoader(transformed_data, batch_size=batch_size, sampler=train_sub_sampler, drop_last=True)
+        train_loader = DataLoader(data, batch_size=batch_size, sampler=train_sub_sampler, drop_last=True)
         val_loader = DataLoader(data, batch_size=batch_size, sampler=val_sub_sampler, drop_last=False)
-        test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
+        # test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
 
         model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
         # print(model)
@@ -131,7 +131,7 @@ def train_subject(subject_data):
         optim = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=True)
 
         if scheduler_name == 'plateau':
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=200,
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=20,
                                                                    min_lr=0.1 * 1e-7,
                                                                    factor=0.1)
         elif scheduler_name == 'multistep':
@@ -150,10 +150,10 @@ def train_subject(subject_data):
                                weights=None, device=device, scheduler=scheduler)
         best_model = trainer.train(train_loader, val_loader)
 
-
         model.load_state_dict(best_model['model_state_dict'])
         model.eval()
-        test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, test_loader)
+        # test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, test_loader)
+        test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, val_loader)
 
         print(f"Best Val AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         print(f"Test AUC Score = {test_auroc}")
@@ -193,11 +193,8 @@ def parse_args():
     parser.add_argument('--ebg_transform', type=str, default='tfr_morlet')
     parser.add_argument('--subject_id', type=int, default=0)
     parser.add_argument('--eeg', type=str, default='eegnet1d')
-    # parser.add_argument('--optim_name', type=str, default='adamw')
-    # parser.add_argument('-b', '--batch_size', type=int, default=32)
-    # parser.add_argument('--lr', type=float, default=0.0001)
-    # parser.add_argument('--lr_scheduler', type=str, default='plateau')
-    # parser.add_argument('--weight_decay', type=float, default=0.1)
+    parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--patience', type=int, default=20)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--split_seed', type=int, default=42)
@@ -238,6 +235,8 @@ def main():
     else:
         directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
     os.makedirs(os.path.join(main_paths['save_path'], directory_name), exist_ok=True)
+    constants.training_constants['lr'] = args.lr
+    constants.training_constants['patience'] = args.patience
     constants.data_constants['tmin'] = args.tmin
     constants.data_constants['tmax'] = args.tmax
     constants.data_constants['w'] = args.w
