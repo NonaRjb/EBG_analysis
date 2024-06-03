@@ -64,7 +64,7 @@ class ModelTrainer:
             y_true = []
             y_pred = []
             self.model.train()
-            progress_bar = tqdm(train_data_loader)
+            progress_bar = tqdm(train_data_loader, disable=True)
             for x, y in progress_bar:
                 self.optimizer.zero_grad()
                 x = x.to(self.device)
@@ -78,7 +78,7 @@ class ModelTrainer:
                     if len(preds.shape) > 1:
                         preds = preds.squeeze(dim=1)
                     if self.n_classes == 2:
-                        loss_classification = self.loss_cls(preds, y)
+                        loss_classification = self.loss_cls(preds, y.float())
                     else:
                         loss_classification = self.loss_cls(preds.float(), y)
 
@@ -120,6 +120,10 @@ class ModelTrainer:
                         'acc': val_balanaced_acc,
                         'auroc': val_auroc
                     }
+                    # self.y_true_train = torch.stack(y_true).detach().cpu().numpy()
+                    # self.y_pred_train = torch.stack(y_pred).detach().cpu()
+                    # self.y_true_val = torch.stack(y_true_val).detach().cpu()
+                    # self.y_pred_val = torch.stack(y_pred_val).detach().cpu()
                 else:
                     patience -= 1
 
@@ -131,14 +135,9 @@ class ModelTrainer:
                 # if patience == 0:
                 #     break
                 print(f'---------------------- Epoch: {epoch} ----------------------')
-                print(f'Training AUROC: {train_auroc} | Training Acc.: {train_balanced_acc} | Training Loss: {train_loss}')
-                print(f'Validation AUROC: {val_auroc} | Validation Acc: {val_balanaced_acc} | Validation Loss: {val_loss}')
-                print(f'lr = {learning_rate}')
-
-                self.y_true_train.append(torch.stack(y_true).detach().cpu().numpy())
-                self.y_pred_train.append(torch.stack(y_pred).detach().cpu())
-                self.y_true_val.append(torch.stack(y_true_val).detach().cpu())
-                self.y_pred_val.append(torch.stack(y_pred_val).detach().cpu())
+                print(f'Training AUC: {train_auroc} | Acc.: {train_balanced_acc} | Loss: {train_loss}')
+                print(f'Validation AUC: {val_auroc} | Acc: {val_balanaced_acc} | Loss: {val_loss}')
+                # print(f'lr = {learning_rate}')
                 
                 wandb.log({
                     # "train_acc": train_balanced_acc,
@@ -152,8 +151,8 @@ class ModelTrainer:
                 })
                 
 
-        print("Finished training.")
-        print("Creating checkpoint.")
+        # print("Finished training.")
+        # print("Creating checkpoint.")
 
         if best_model is None:
             best_model = {
@@ -172,7 +171,14 @@ class ModelTrainer:
         # np.save(os.path.join(self.save_path, "y_pred_train.npy"), np.array(self.y_pred_train))
         # np.save(os.path.join(self.save_path, "y_true_val.npy"), np.array(self.y_true_val))
         # np.save(os.path.join(self.save_path, "y_pred_val.npy"), np.array(self.y_pred_val))
-        print("Finished creating checkpoint.")
+        # print("Finished creating checkpoint.")
+
+        # predictions = {
+        #     'y_true_train': np.array(self.y_true_train),
+        #     'y_pred_train': np.array(self.y_pred_train),
+        #     'y_true_val': np.array(self.y_true_val),
+        #     'y_pred_val': np.array(self.y_pred_val)
+        # }
 
         return best_model
 
@@ -182,7 +188,7 @@ class ModelTrainer:
         y_true = []
         y_pred = []
         loss_epoch = []
-        progress_bar = tqdm(data_loader)
+        progress_bar = tqdm(data_loader, disable=True)
         with torch.no_grad():
             for x, y in progress_bar:
                 x = x.to(self.device)
@@ -191,14 +197,14 @@ class ModelTrainer:
                 else:
                     y = y.to(torch.long).to(self.device)
 
-                with autocast(enabled=self.mixed_precision):
-                    preds = model(x)
-                    if len(preds.shape) > 1:
-                        preds = preds.squeeze(dim=1)
-                    if self.n_classes == 2:
-                        loss_classification = self.loss_cls(preds, y)
-                    else:
-                        loss_classification = self.loss_cls(preds.float(), y)
+                # with autocast(enabled=self.mixed_precision):
+                preds = model(x)
+                if len(preds.shape) > 1:
+                    preds = preds.squeeze(dim=1)
+                if self.n_classes == 2:
+                    loss_classification = self.loss_cls(preds, y.float())
+                else:
+                    loss_classification = self.loss_cls(preds.float(), y)
 
                 loss_epoch.append(loss_classification.item())
                 y_true.extend(y)

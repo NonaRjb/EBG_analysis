@@ -18,15 +18,12 @@ class EBG4(Dataset):
             intensity: bool = False,
             pick_subjects: int = 0,
             normalize: bool = False,
-            fs_new: int = None
+            fs_new: int = None,
+            transform=None
     ):
 
         self.root_path = root_path
         if pick_subjects == 0:
-            # if data_type != 'source':
-            #     subjects = [subject_id for subject_id in range(1, 38) if subject_id != 10]
-            # else:
-            #     subjects = [subject_id for subject_id in range(1, 26) if subject_id != 10]
             if data_type == "source" or "source" in modality:
                 subjects = [subject_id for subject_id in range(1, 54) if subject_id not in [10, 3]]
             else:
@@ -46,6 +43,7 @@ class EBG4(Dataset):
         self.time_vec = None
         self.class_weight = None
         self.modality = modality
+        self.transform = transform
 
         for i, subject in enumerate(subjects):
             source_data, label, time_vec, fs = load_ebg4(root_path, subject, data_type, fs_new=fs_new)
@@ -119,11 +117,11 @@ class EBG4(Dataset):
                     sniff_data = np.expand_dims(sniff_data, axis=1)
                     source_data = np.concatenate((source_data, sniff_data), axis=1)
                 elif modality == 'source-ebg' or modality == 'ebg-source':
-                    sensor_data = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
+                    sensor_data, _, _, _ = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
                     sensor_data = sensor_data[:, 63:-1, :len(time_vec)]
                     source_data = np.concatenate((source_data, sensor_data), axis=1)
                 elif modality == 'source-eeg' or modality == 'eeg-source':
-                    sensor_data = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
+                    sensor_data, _, _, _ = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
                     sensor_data = sensor_data[:, :63, :len(time_vec)]
                     source_data = np.concatenate((source_data, sensor_data), axis=1)
                 else:
@@ -194,6 +192,7 @@ class EBG4(Dataset):
         self.data = self.source_data
         self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
         self.data = self.data[..., self.t_min:self.t_max] - self.baseline
+        # self.data = np.random.randn(*self.data.shape).astype(np.float64)
         self.percentile_95 = np.percentile(np.abs(self.data), 95, axis=-1, keepdims=True)
 
     def __len__(self):
@@ -210,6 +209,8 @@ class EBG4(Dataset):
             sample[-1, ...] = sample_normalized[-1, ...]
 
         sample = torch.from_numpy(sample)
+        if self.transform:
+            sample = self.transform(sample)
         return sample, self.labels[item]
 
 

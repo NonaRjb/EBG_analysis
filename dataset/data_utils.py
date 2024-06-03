@@ -159,6 +159,7 @@ def load_source_ebg4(filename):
 
     mat73_files = [i for i in range(21, 54)]
     mat73_files.append(3)
+    print(mat73_files)
     if int(filename.split("/")[-2]) in mat73_files:
         data_struct = mat73.loadmat(filename)
 
@@ -375,7 +376,7 @@ class RandomNoise(object):
         if self.p < torch.rand(1):
             return x
         if self.std is None:
-            self.std = x.std(dim=-1, keepdims=True) / 4.
+            self.std = x.std(axis=-1, keepdims=True) / 4.
         if self.mean is None:
             self.mean = x.mean(dim=-1, keepdims=True)
         noise = torch.randn_like(x)
