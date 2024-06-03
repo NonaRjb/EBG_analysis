@@ -987,9 +987,9 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/w_results/"
         plot_logreg_win_res(path_to_data, 0.1, path_to_save)
     elif task == "plot_dnn_res":
-        path_to_data = '/Volumes/T5 EVO/Smell/plots/ebg4_dnn/test_ebg-sniff/'
+        path_to_data = '/Volumes/T5 EVO/Smell/plots/ebg4_dnn/test_ebg-sniff_best_auc/'
         # path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-ebg/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/test_ebg-sniff_plots/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/test_ebg-sniff_best_auc_plots/"
         # path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/ebg4_source_eegnet1d_source-ebg_plots/"
         plot_dnn_res(path_to_data, path_to_save, "ebg-sniff")
     elif task == "plot_dnn_win_res":

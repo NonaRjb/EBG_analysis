@@ -140,31 +140,27 @@ class ModelTrainer:
                 # print(f'lr = {learning_rate}')
                 
                 wandb.log({
-                    # "train_acc": train_balanced_acc,
                     "train_loss": train_loss,
                     "train_auroc": train_auroc,
-                    # "val_acc": val_balanaced_acc,
                     "val_loss": val_loss,
                     "val_auroc": val_auroc,
                     "lr": learning_rate,
                     "epoch": epoch
                 })
-                
-
-        # print("Finished training.")
-        # print("Creating checkpoint.")
-
-        if best_model is None:
-            best_model = {
-                'epoch': self.epochs,
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'loss': val_loss,
-                'acc': val_balanaced_acc,
-                'auroc': val_auroc
-            }
 
         print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        # if best_model is None:
+        # set the best model to the final model
+        best_model = {
+            'epoch': self.epochs,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'loss': val_loss,
+            'acc': val_balanaced_acc,
+            'auroc': val_auroc
+        }
+
+        print(f"Final Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         # filename = os.path.join(self.save_path, 'checkpoint.pth.tar')
         # torch.save(best_model, filename)
         # np.save(os.path.join(self.save_path, "y_true_train.npy"), np.array(self.y_true_train))
