@@ -16,7 +16,7 @@ class DNNConfig:
             'ebg_transform': None,
             'normalize': True,
             'shuffle_labels': False,
-            'modality': 'ebg-sniff',
+            'modality': 'sniff',
             'intensity': False,
             'n_classes': 2,
             'tfr_freqs': np.linspace(20, 100, 160),
@@ -29,7 +29,9 @@ class DNNConfig:
             'weight_decay': 0.1,
             'lr': 0.0001,
             'batch_size': 16,
-            'optim_name': 'adamw'
+            'optim_name': 'adamw',
+            # 'fold': 1,
+            'warmup_steps': 100
         }
 
         if self.data_constants['fmax'] is not None and self.data_constants['fmin'] is not None:

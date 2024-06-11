@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.multiprocessing import Pool, set_start_method
-from torch.optim import Adam, RMSprop, SGD, AdamW
+from torch.optim import Adam, RMSprop, SGD, AdamW, lr_scheduler
 from torch.utils.data import DataLoader
 from sklearn.model_selection import RepeatedStratifiedKFold
 import torchvision.transforms as transforms
@@ -20,10 +20,10 @@ from dataset.data_utils import RandomNoise, RandomMask, TemporalJitter
 
 os.environ["WANDB_API_KEY"] = "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 os.environ['WANDB_START_METHOD'] = 'thread'
-cluster_data_path = '/local_storage/datasets/nonar/ebg/'
-cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-# cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
-# cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
+# cluster_data_path = '/local_storage/datasets/nonar/ebg/'
+# cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
+cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
 
@@ -37,11 +37,20 @@ data_transforms = transforms.Compose([
         ])
 
 
-def dummy_function(a):
-    x1 = torch.randn((10000, 10000)).to("cuda:0")
-    while True:
-        _ = x1 * x1
+class WarmUpLR(lr_scheduler._LRScheduler):
+    def __init__(self, optimizer, warmup_steps, start_lr, target_lr, last_epoch=-1):
+        self.warmup_steps = warmup_steps
+        self.start_lr = start_lr
+        self.target_lr = target_lr
+        self.delta_lr = (target_lr - start_lr) / warmup_steps
+        super(WarmUpLR, self).__init__(optimizer, last_epoch)
 
+    def get_lr(self):
+        if self.last_epoch < self.warmup_steps:
+            return [self.start_lr + self.delta_lr * self.last_epoch for _ in self.optimizer.param_groups]
+        else:
+            return [base_lr for base_lr in self.base_lrs]
+        
 
 def train_subject(subject_data):
     # wandb.init()
@@ -55,6 +64,8 @@ def train_subject(subject_data):
     scheduler_name = constants.training_constants['scheduler_name']
     optim_name = constants.training_constants['optim_name']
     batch_size = constants.training_constants['batch_size']
+    # fold = str(constants.training_constants['fold'])+".pkl"
+    i = constants.training_constants['fold']-1
 
     paths = {
         "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
@@ -80,17 +91,17 @@ def train_subject(subject_data):
         device=device, **constants.data_constants
     )
 
-    # _, transformed_data, _ = load_data.load(
-    #     dataset_name=dataset_name,
-    #     path=paths['eeg_data'],
-    #     batch_size=batch_size,
-    #     seed=seed,
-    #     split_seed=split_seed,
-    #     augmentation=False,
-    #     subject_id=subject,
-    #     transform=data_transforms,
-    #     device=device, **constants.data_constants
-    # )
+    _, transformed_data, _ = load_data.load(
+        dataset_name=dataset_name,
+        path=paths['eeg_data'],
+        batch_size=batch_size,
+        seed=seed,
+        split_seed=split_seed,
+        augmentation=False,
+        subject_id=subject,
+        transform=data_transforms,
+        device=device, **constants.data_constants
+    )
 
     # constants.model_constants['lstm']['input_size'] = data.f_max - data.f_min
     print("EEG sequence length = ", n_time_samples)
@@ -99,44 +110,43 @@ def train_subject(subject_data):
     data.labels = np.array(data.labels)
 
     g = torch.Generator().manual_seed(seed)
-    for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subject)))):
+    skf = RepeatedStratifiedKFold(n_splits=10, n_repeats=10, random_state=seed)
+    # for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subject)))):
+    for i, (train_index, val_index) in enumerate(skf.split(data.data, data.labels)):
         metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': [], 'val_auroc': []}
-        with open(os.path.join(splits_path, str(subject), fold), 'rb') as f:
-            split = pickle.load(f)
-        train_index = split['train']
-        val_index = split['val']
+        # with open(os.path.join(splits_path, str(subject), fold), 'rb') as f:
+        #     split = pickle.load(f)
+        # train_index = split['train']
+        # val_index = split['val']
         # test_index = split['test']
-
         val_labels = data.labels[val_index]
         # test_labels = data.labels[test_index]
-
-        if np.sum(val_labels == 1) == 0:  # or np.sum(test_labels == 1) == 0:
-            continue
-
+        # if np.sum(val_labels == 1) == 0:  # or np.sum(test_labels == 1) == 0:
+        #     continue
         # Sample elements randomly from a given list of ids, no replacement.
         train_sub_sampler = torch.utils.data.SubsetRandomSampler(train_index, generator=g)
         val_sub_sampler = torch.utils.data.SubsetRandomSampler(val_index, generator=g)
         # test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_index, generator=g)
-
         # Create DataLoader for training and validation
         train_loader = DataLoader(data, batch_size=batch_size, sampler=train_sub_sampler, drop_last=True)
         val_loader = DataLoader(data, batch_size=batch_size, sampler=val_sub_sampler, drop_last=False)
         # test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
-
         model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
         # print(model)
         # print(f"Training {eeg_enc_name} on {dataset_name} with {constants.model_constants[eeg_enc_name]}")
         model = model.double()
-
         optim = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=True)
-
         if scheduler_name == 'plateau':
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=20,
-                                                                   min_lr=0.1 * 1e-7,
-                                                                   factor=0.1)
+            # warmup_scheduler = WarmUpLR(
+            #     optim, warmup_steps=constants.training_constants['warmup_steps'], 
+            #     start_lr=0.000001, target_lr=0.00005)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, patience=constants.training_constants['patience'],
+                                                                min_lr=0.1 * 1e-7,
+                                                                factor=0.1)
+
         elif scheduler_name == 'multistep':
             scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[16, 64, 256],
-                                                             gamma=0.1)
+                                                            gamma=0.1)
         elif scheduler_name == 'exp':
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.99, last_epoch=-1)
         elif scheduler_name == 'linear':
@@ -146,27 +156,28 @@ def train_subject(subject_data):
         else:
             raise NotImplementedError
         trainer = ModelTrainer(model=model, optimizer=optim, n_epochs=epochs,
-                               n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
-                               weights=None, device=device, scheduler=scheduler)
+                            n_classes=constants.data_constants['n_classes'], save_path=paths['save_path'],
+                            weights=None, device=device, scheduler=scheduler, warmup=None, 
+                            warmup_steps=constants.training_constants['warmup_steps'], batch_size=batch_size)
         best_model = trainer.train(train_loader, val_loader)
-
-        model.load_state_dict(best_model['model_state_dict'])
+        # model.load_state_dict(best_model['model_state_dict'])
         model.eval()
         # test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, test_loader)
         test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, val_loader)
-
-        print(f"Best Val AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        print(f"Best Val Loss = {best_model['loss']}, AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         print(f"Test AUC Score = {test_auroc}")
-        metrics['loss'].append(test_loss)
-        metrics['acc'].append(test_acc)
+        # metrics['loss'].append(test_loss)
+        # metrics['acc'].append(test_acc)
         metrics['auroc'].append(test_auroc)
+        # metrics['epoch'].append(best_model['epoch'])
+        # metrics['val_auroc'].append(best_model['auroc'])
+        metrics['loss'].append(best_model['loss'])
+        metrics['acc'].append(best_model['acc'])
         metrics['epoch'].append(best_model['epoch'])
-        metrics['val_auroc'].append(best_model['auroc'])
-
+        # metrics['auroc'].append(best_model['auroc'])
         with open(os.path.join(paths['save_path'], f'{i+1}.pkl'),
-                  'wb') as f:
+                'wb') as f:
             pickle.dump(metrics, f)
-
         del model
 
 
@@ -196,6 +207,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--patience', type=int, default=20)
     parser.add_argument('--epoch', type=int, default=1000)
+    # parser.add_argument('--fold', type=int, default=1)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--split_seed', type=int, default=42)
     return parser.parse_args()
@@ -230,17 +242,21 @@ def main():
         "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
         "save_path": cluster_save_path if device == 'cuda' else local_save_path
     }
-    if constants.data_constants['modality'] == "source":
-        directory_name = f"{dataset_name}_{eeg_enc_name}"
-    else:
-        directory_name = f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}"
-    os.makedirs(os.path.join(main_paths['save_path'], directory_name), exist_ok=True)
+
     constants.training_constants['lr'] = args.lr
     constants.training_constants['patience'] = args.patience
     constants.data_constants['tmin'] = args.tmin
     constants.data_constants['tmax'] = args.tmax
     constants.data_constants['w'] = args.w
     constants.data_constants['ebg_transform'] = args.ebg_transform
+
+    if constants.data_constants['modality'] == "source":
+        directory_name = f"{dataset_name}_{eeg_enc_name}_lr{args.lr}_pat{args.patience}"
+    else:
+        directory_name = \
+            f"{dataset_name}_{eeg_enc_name}_{constants.data_constants['modality']}_lr{args.lr}_pat{args.patience}"
+    os.makedirs(os.path.join(main_paths['save_path'], directory_name), exist_ok=True)
+    
     if constants.data_constants['modality'] == "source":
         for key in constants.model_constants.keys():
             if "n_channels" in constants.model_constants[key].keys():
@@ -300,6 +316,7 @@ def main():
         device=device, **constants.data_constants
     )
 
+    # constants.training_constants['fold'] = args.fold
     constants.model_constants['eegnet']['n_samples'] = n_time_samples
     constants.model_constants['eegnet1d']['n_samples'] = n_time_samples
     constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples

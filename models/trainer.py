@@ -19,12 +19,18 @@ class ModelTrainer:
             n_epochs: int,
             n_classes: int,
             scheduler,
-            save_path, device='cuda'
+            save_path, 
+            warmup=None,
+            device='cuda',
+            **kwargs
     ):
 
         self.device = device
         self.n_classes = n_classes
         self.model = model.to(device)
+        self.warmup = warmup
+        self.warmup_steps = kwargs['warmup_steps']
+        self.batch_size = kwargs['batch_size']
         if n_classes == 2:
             self.loss_cls = nn.BCEWithLogitsLoss().to(self.device)
             self.accuracy = Accuracy(task='binary').to(self.device)
@@ -91,6 +97,9 @@ class ModelTrainer:
                 scaler.step(self.optimizer)
                 scaler.update()
 
+                if epoch * len(train_data_loader) + self.batch_size < self.warmup_steps and self.warmup is not None:
+                    self.warmup.step()
+
                 steps += 1
 
             with torch.no_grad():
@@ -107,10 +116,10 @@ class ModelTrainer:
 
             if epoch % self.log_freq == 0 or epoch == self.epochs - 1:
                 val_loss, val_balanaced_acc, val_auroc, y_true_val, y_pred_val = self.evaluate(self.model, val_data_loader)
-                # if val_loss < best_loss:
-                if val_auroc > best_acc:
-                    # best_loss = val_loss
-                    best_acc = val_auroc
+                if val_loss < best_loss:
+                # if val_auroc > best_acc:
+                    best_loss = val_loss
+                    # best_acc = val_auroc
                     patience = self.patience
                     best_model = {
                         'epoch': epoch,
@@ -130,7 +139,9 @@ class ModelTrainer:
                 for param_group in self.optimizer.param_groups:
                     learning_rate = param_group["lr"]
 
-                self.scheduler.step(val_loss)
+                # self.scheduler.step(val_loss)
+                if epoch * len(train_data_loader) + self.batch_size >= self.warmup_steps or self.warmup is None:
+                    self.scheduler.step(val_loss)
 
                 # if patience == 0:
                 #     break
@@ -145,24 +156,24 @@ class ModelTrainer:
                     "val_loss": val_loss,
                     "val_auroc": val_auroc,
                     "lr": learning_rate,
-                    "epoch": epoch
+                    "epoch": epoch,
                 })
 
         print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         # if best_model is None:
         # set the best model to the final model
-        best_model = {
-            'epoch': self.epochs,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'loss': val_loss,
-            'acc': val_balanaced_acc,
-            'auroc': val_auroc
-        }
+        # best_model = {
+        #     'epoch': self.epochs,
+        #     'model_state_dict': self.model.state_dict(),
+        #     'optimizer_state_dict': self.optimizer.state_dict(),
+        #     'loss': val_loss,
+        #     'acc': val_balanaced_acc,
+        #     'auroc': val_auroc
+        # }
 
-        print(f"Final Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
-        # filename = os.path.join(self.save_path, 'checkpoint.pth.tar')
-        # torch.save(best_model, filename)
+        #print(f"Final Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        
+
         # np.save(os.path.join(self.save_path, "y_true_train.npy"), np.array(self.y_true_train))
         # np.save(os.path.join(self.save_path, "y_pred_train.npy"), np.array(self.y_pred_train))
         # np.save(os.path.join(self.save_path, "y_true_val.npy"), np.array(self.y_true_val))
