@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn import LSTM, RNN
 from collections import OrderedDict
 import numpy as np
 
