@@ -321,6 +321,7 @@ def main():
     constants.model_constants['eegnet1d']['n_samples'] = n_time_samples
     constants.model_constants['eegnet_attention']['n_samples'] = n_time_samples
     constants.model_constants['resnet1d']['n_samples'] = n_time_samples
+    constants.model_constants['resnet1d']['net_seq_length'][0] = n_time_samples
     subject_data_list = [(sid, eeg_enc_name, dataset_name, epochs, seed, split_seed, directory_name, device, constants)
                          for sid in subject_ids]
     print("number of available CPUs = ", os.cpu_count())
