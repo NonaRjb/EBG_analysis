@@ -271,7 +271,7 @@ def crop_tfr(tfr, tmin, tmax, fmin, fmax, tvec, freqs, w=None, fs=512) -> np.nda
             tmax = tmin + w
             t_max = np.abs(tvec - tmax).argmin()
 
-    print(f"Number of Time Samples: {t_max - t_min}")
+    # print(f"Number of Time Samples: {t_max - t_min}")
 
     if fmin is None:
         f_min = 0

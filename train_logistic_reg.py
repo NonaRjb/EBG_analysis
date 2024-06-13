@@ -3,11 +3,11 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score, precision_recall_curve, auc
 from sklearn.dummy import DummyClassifier
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_validate, GridSearchCV, cross_val_score
 from mne.decoding import CSP, UnsupervisedSpatialFilter
 from dataset.data_utils import load_ebg1_mat
 from models.load_model import load_ml_model
@@ -55,6 +55,10 @@ model_kwargs = {
         "random_state": 42 
     }
 }
+
+time_windows = [(0.00, 0.25), (0.15, 0.40), (0.30, 0.55), (0.45, 0.70), (0.60, 0.85), (0.75, 1.0)]
+# time_windows = [(0.00, 0.3), (0.2, 0.50), (0.40, 0.7), (0.6, 0.9)]
+
 
 
 def confusion_matrix_scorer(clf_, X_, y):
@@ -242,6 +246,7 @@ def parse_args():
     parser.add_argument('--modality', type=str, default="ebg")
     parser.add_argument('--model', type=str, default='logreg')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--task', type=str, default="grid_search_c")
     parser.add_argument('--save', action='store_true')
     return parser.parse_args()
 
@@ -262,6 +267,10 @@ if __name__ == "__main__":
     seed = args.seed
     c = args.c
     w = args.w
+    task = args.task
+
+    if task == "grid_search_c": 
+        time_windows = [(args.tmin, args.tmax)]
 
     for k in model_kwargs.keys():
         if 'random_state' in model_kwargs[k].keys():
@@ -272,7 +281,8 @@ if __name__ == "__main__":
             model_kwargs[k]['alpha'] = c
 
     save_path = os.path.join(save_path, "plots")
-    save_path = os.path.join(save_path, "grid_search_c" if w is None else "grid_search_c_tmin")
+    # save_path = os.path.join(save_path, "grid_search_c" if w is None else "grid_search_c_tmin")
+    save_path = os.path.join(save_path, task)
     os.makedirs(save_path, exist_ok=True)
     if args.data_type != "source":
         save_path = os.path.join(save_path, dataset_name+"_"+args.modality+"_"+args.model)
@@ -290,173 +300,135 @@ if __name__ == "__main__":
             subject_ids = [i for i in range(1, 54) if i != 10]
         else:
             raise NotImplementedError
-
-        aucroc_scores = {}
-        for subj in subject_ids:
-            data_array, labels_array, t, sfreq = load_data(
-                name=dataset_name,
-                root_path=data_path,
-                subject_id=subj,
-                data_type=args.data_type,
-                modality=args.modality,
-                tmin=None,
-                tmax=None,
-                bl_lim=None,
-                binary=True
-            )
-
-            freqs = np.arange(5, 100)
-            tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
-
-            # apply baseline correction
-            tfr = apply_baseline(tfr, bl_lim=(-1.0, -0.6), tvec=t, mode='logratio')
-
-            # crop the time interval of interest
-            tfr = crop_tfr(tfr,
-                           tmin=args.tmin, tmax=args.tmax,
-                           fmin=args.fmin, fmax=args.fmax,
-                           tvec=t, freqs=freqs,
-                           w=w,
-                           fs=256)
-            
-            n_trials = tfr.shape[0]
-            n_time_samples = tfr.shape[-1]
-
-            if args.data_type == "source":
-                collapsed_tfr_mean = tfr.reshape((n_trials, 4, 12, 5, n_time_samples))
-                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
-            elif args.modality == "eeg":
-                collapsed_tfr_mean = tfr.reshape((n_trials, 63, 12, 5, n_time_samples))
-                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
-            else:
-                # take the mean over channels
-                tfr_mean = tfr.mean(axis=1).squeeze()
-                collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
-                tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
-
-            data_array = crop_temporal(data_array, args.tmin, args.tmax, t)
-
-            # X = tfr_mean
-            X = tfr_mean.reshape(n_trials, -1)
-            # X = data_array.astype(float)
-
-            y = np.asarray(labels_array)
-
-            csp = CSP(n_components=4, reg=1e-05, log=None, transform_into='average_power', norm_trace=False)
-
-            # skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
-            aucroc_scores[str(subj)] = []
-            aucpr_scores = []
-            # for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-            for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subj)))):
-
-                with open(os.path.join(splits_path, str(subj), fold), 'rb') as f:
-                    split = pickle.load(f)
-                train_index = split['train']
-                test_index = split['val']
-
-                clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
-                
-                X_train, X_test = X[train_index], X[test_index]
-                y_train, y_test = y[train_index], y[test_index]
-
-                # csp.fit(X_train, y_train)
-
-                # Count samples from each class in train and test sets
-                unique_train, counts_train = np.unique(y_train, return_counts=True)
-                unique_test, counts_test = np.unique(y_test, return_counts=True)
-
-                # print(f"Fold {fold + 1}:")
-                print(f"Fold {i + 1}:")
-                # print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
-                # print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
-
-                clf = clf.fit(X_train, y_train)
-                prob_scores = clf.predict_proba(X_test)[:, 1]
-                # precision, recall, _ = precision_recall_curve(y_test, prob_scores)
-                # aucpr_score = auc(recall, precision)
-                aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-                aucroc_scores[str(subj)].append(aucroc_score)
-                # aucpr_scores.append(aucpr_score)
-                print(f"Model AUCROC = {aucroc_score}")
-
-            if args.save is True:
-                print("Saving the AUC Scores")
-                os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
-                np.save(
-                    os.path.join(save_path, str(subj), f"c{c}_t{args.tmin}.npy") if w is not None else os.path.join(save_path, str(subj), f"{c}.npy"),
-                    np.asarray(aucroc_scores[str(subj)])
-                )
     else:
+        subject_ids = [args.subject_id]
 
+    aucroc_scores = {}
+    for subj in subject_ids:
+            
         data_array, labels_array, t, sfreq = \
-            load_data(
-                name=dataset_name,
-                root_path=data_path,
-                subject_id=args.subject_id,
-                data_type=args.data_type,
-                modality=args.modality,
-                tmin=None,
-                tmax=None,
-                bl_lim=None,
-                binary=True
-            )
+        load_data(
+            name=dataset_name,
+            root_path=data_path,
+            subject_id=subj,
+            data_type=args.data_type,
+            modality=args.modality,
+            tmin=None,
+            tmax=None,
+            bl_lim=None,
+            binary=True
+        )
 
         freqs = np.arange(5, 100)
         tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
-
-        # apply baseline correction
         tfr = apply_baseline(tfr, bl_lim=(-1.0, -0.6), tvec=t, mode='logratio')
 
-        # crop the time interval of interest
-        tfr = crop_tfr(tfr, tmin=args.tmin, tmax=args.tmax, fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
-        # take the mean over channels
-        tfr_mean = tfr.mean(axis=1).squeeze()
-        n_trials = tfr_mean.shape[0]
-        X = tfr_mean.reshape(n_trials, -1)
-        # X = data_array
+        n_trials = tfr.shape[0]
         y = np.asarray(labels_array)
+        data = data_array
 
-        csp = CSP(n_components=4, reg=1e-05, log=True, norm_trace=False)
-        clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
-        skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
+        outer_cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+        # outer_cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=2, random_state=seed)
 
-        aucroc_scores = []
-        aucpr_scores = []
-        for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-            X_train, X_test = X[train_index], X[test_index]
-            y_train, y_test = y[train_index], y[test_index]
+        aucroc_scores[str(subj)] = []
+        for fold, (train_index, test_index) in enumerate(outer_cv.split(data, y)):
+            best_models_win = []
+            best_results_win = []
+            for win in time_windows:
+                tfr_cropped = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
+                # data_array = crop_temporal(data_array, win[0], win[1], t)
 
-            # Count samples from each class in train and test sets
-            unique_train, counts_train = np.unique(y_train, return_counts=True)
-            unique_test, counts_test = np.unique(y_test, return_counts=True)
+                n_time_samples = tfr_cropped.shape[-1]
+                if args.data_type == "source":
+                    collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 4, 12, 5, n_time_samples))
+                    tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+                elif args.modality == "eeg":
+                    collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 12, 5, n_time_samples))
+                    tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+                else:
+                # take the mean over channels
+                    tfr_mean = tfr_cropped.mean(axis=1).squeeze()
+                    collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
+                    tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
+            
+                # tfr_mean = tfr_cropped.mean(axis=1).squeeze()
+                X = tfr_mean.reshape(n_trials, -1)
+                # X = data_array
+                # clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
 
-            print(f"Fold {fold + 1}:")
-            # print(f"  Train - Class 0: {counts_train[0]}, Class 1: {counts_train[1]}")
-            # print(f"  Test  - Class 0: {counts_test[0]}, Class 1: {counts_test[1]}")
-            # dummy_aucpr_score = (counts_train[1] + counts_test[1]) / (counts_train.sum() + counts_test.sum())
-            clf = clf.fit(X_train, y_train)
-            prob_scores = clf.predict_proba(X_test)[:, 1]
-            # precision, recall, _ = precision_recall_curve(y_test, prob_scores)
-            # aucpr_score = auc(recall, precision)
+                # X_train, X_test = X[train_index], X[test_index]
+                # y_train, y_test = y[train_index], y[test_index]
+                X_train, y_train = X[train_index], y[train_index]
+
+                # Count samples from each class in train and test sets
+                # unique_train, counts_train = np.unique(y_train, return_counts=True)
+                # unique_test, counts_test = np.unique(y_test, return_counts=True)
+
+                inner_cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=3, random_state=seed)
+                clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
+                space = dict()
+                space['C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
+                # define search
+                search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True)
+                # execute search
+                result = search.fit(X_train, y_train)
+                # get the best performing model fit on the whole training set
+                best_model = result.best_estimator_
+                # evaluate model on the hold out dataset
+                # prob_scores = best_model.predict_proba(X_test)[:, 1]
+                # clf = clf.fit(X_train, y_train)
+                # prob_scores = clf.predict_proba(X_test)[:, 1]
+                # aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
+                # aucroc_scores.append(aucroc_score)
+                # print('>acc=%.3f, est=%.3f, cfg=%s' % (aucroc_score, result.best_score_, result.best_params_))
+                # print(f"Model AUCROC = {aucroc_score}")
+                best_models_win.append(best_model)
+                best_results_win.append(result.best_score_)
+            
+            best_result_final = max(best_results_win)
+            best_model_final = best_models_win[best_results_win.index(best_result_final)]
+            best_win = time_windows[best_results_win.index(best_result_final)]
+
+            print(f"Best Window is {best_win}")
+
+            tfr_cropped = crop_tfr(tfr, tmin=best_win[0], tmax=best_win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
+            
+            n_time_samples = tfr_cropped.shape[-1]
+            if args.data_type == "source":
+                collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 4, 12, 5, n_time_samples))
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+            elif args.modality == "eeg":
+                collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 12, 5, n_time_samples))
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+            else:
+            # take the mean over channels
+                tfr_mean = tfr_cropped.mean(axis=1).squeeze()
+                collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
+                tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
+            
+            # tfr_mean = tfr_cropped.mean(axis=1).squeeze()
+            X = tfr_mean.reshape(n_trials, -1)
+
+            X_test, y_test = X[test_index], y[test_index]
+
+            prob_scores = best_model_final.predict_proba(X_test)[:, 1]
             aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-            aucroc_scores.append(aucroc_score)
-            # aucpr_scores.append(aucpr_score)
+            aucroc_scores[str(subj)].append(aucroc_score)
 
-            # print(f"Model AUCPR = {aucpr_score} | Dummy AUCPR = {dummy_aucpr_score}")
-            print(f"Model AUCROC = {aucroc_score}")
+            print(f"Best Model's:  Val Score = {best_result_final}, Test Score = {aucroc_score}")
 
+        print(f"Median AUC: {np.median(np.asarray(aucroc_scores[str(subj)]))}")
         if args.save is True:
-            print("Saving the AUC Scores")
-            os.makedirs(os.path.join(save_path, str(args.subject_id)), exist_ok=True)
-            np.save(
-                    os.path.join(save_path, str(args.subject_id), f"c{c}_t{args.tmin}.npy") if w is not None else os.path.join(save_path, str(args.subject_id), f"{c}.npy"),
-                    np.asarray(aucroc_scores[str(args.subject_id)])
+                print("Saving the AUC Scores")
+                os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
+                np.save(
+                    os.path.join(save_path, str(subj), f"{best_win[0]}_{best_win[1]}.npy"),
+                    np.asarray(aucroc_scores[str(subj)])
                 )
-        plt.boxplot(aucroc_scores, labels=[str(args.subject_id)])
-        plt.axhline(y=0.5, color='r', linestyle='--')
-        plt.title(f"AUC Scores Subject {args.subject_id}, C = {c}")
-        os.makedirs(os.path.join(save_path, "plots"), exist_ok=True)
-        os.makedirs(os.path.join(save_path, "plots", str(args.subject_id)), exist_ok=True)
-        plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"c{c}.png"))
+        # plt.boxplot(aucroc_scores, labels=[str(args.subject_id)])
+        # plt.axhline(y=0.5, color='r', linestyle='--')
+        # plt.title(f"AUC Scores Subject {args.subject_id}, C = {c}")
+        # os.makedirs(os.path.join(save_path, "plots"), exist_ok=True)
+        # os.makedirs(os.path.join(save_path, "plots", str(args.subject_id)), exist_ok=True)
+        # plt.savefig(os.path.join(save_path, "plots", str(args.subject_id), f"c{c}.png"))
         # plt.show()

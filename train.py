@@ -20,10 +20,10 @@ from dataset.data_utils import RandomNoise, RandomMask, TemporalJitter
 
 os.environ["WANDB_API_KEY"] = "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 os.environ['WANDB_START_METHOD'] = 'thread'
-cluster_data_path = '/local_storage/datasets/nonar/ebg/'
-cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-# cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
-# cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
+# cluster_data_path = '/local_storage/datasets/nonar/ebg/'
+# cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
+cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
 
@@ -70,7 +70,7 @@ def train_subject(subject_data):
         "eeg_data": cluster_data_path if device == 'cuda' else local_data_path,
         "save_path": cluster_save_path if device == 'cuda' else local_save_path
     }
-    splits_path = os.path.join(paths['eeg_data'], "splits_ebg4")
+    splits_path = os.path.join(paths['eeg_data'], "splits_ebg4_with_test")
     os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject)), exist_ok=True)
     # os.makedirs(os.path.join(paths['save_path'], directory_name, str(subject_id), str(args.tmin)),
     #             exist_ok=True)
