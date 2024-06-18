@@ -1,15 +1,12 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score, precision_recall_curve, auc
 from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import cross_validate, GridSearchCV, cross_val_score
 from mne.decoding import CSP, UnsupervisedSpatialFilter
-from dataset.data_utils import load_ebg1_mat
+from dataset.data_utils import load_ebg1_mat, tfr_feature_extract
 from models.load_model import load_ml_model
 import matplotlib.pyplot as plt
 import pickle
@@ -33,6 +30,11 @@ model_kwargs = {
         'max_iter': 2000,
         'random_state': 42
         },
+    'svm':{
+        'C': 1.0,
+        'kernel': 'linear',
+        'probability': True
+        }, 
     'gradboost':{
         "n_estimators": 100,
         "learning_rate": 0.1,
@@ -320,7 +322,7 @@ if __name__ == "__main__":
         )
 
         freqs = np.arange(5, 100)
-        tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='dpss')
+        tfr = apply_tfr(data_array, sfreq, freqs=freqs, n_cycles=3, method='morlet')
         tfr = apply_baseline(tfr, bl_lim=(-1.0, -0.6), tvec=t, mode='logratio')
 
         n_trials = tfr.shape[0]
@@ -334,6 +336,7 @@ if __name__ == "__main__":
         for fold, (train_index, test_index) in enumerate(outer_cv.split(data, y)):
             best_models_win = []
             best_results_win = []
+            best_params_win = []
             for win in time_windows:
                 tfr_cropped = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
                 # data_array = crop_temporal(data_array, win[0], win[1], t)
@@ -351,7 +354,8 @@ if __name__ == "__main__":
                     collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
                     tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
             
-                # tfr_mean = tfr_cropped.mean(axis=1).squeeze()
+                # tfr_mean = tfr_feature_extract(tfr_cropped)
+                
                 X = tfr_mean.reshape(n_trials, -1)
                 # X = data_array
                 # clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
@@ -359,20 +363,17 @@ if __name__ == "__main__":
                 # X_train, X_test = X[train_index], X[test_index]
                 # y_train, y_test = y[train_index], y[test_index]
                 X_train, y_train = X[train_index], y[train_index]
-
                 # Count samples from each class in train and test sets
                 # unique_train, counts_train = np.unique(y_train, return_counts=True)
                 # unique_test, counts_test = np.unique(y_test, return_counts=True)
 
-                inner_cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=3, random_state=seed)
+                inner_cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=1, random_state=seed)
                 clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
                 space = dict()
-                space['C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
-                # define search
-                search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True)
-                # execute search
+                # space['logreg__C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
+                space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
+                search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True, error_score='raise')
                 result = search.fit(X_train, y_train)
-                # get the best performing model fit on the whole training set
                 best_model = result.best_estimator_
                 # evaluate model on the hold out dataset
                 # prob_scores = best_model.predict_proba(X_test)[:, 1]
@@ -384,12 +385,14 @@ if __name__ == "__main__":
                 # print(f"Model AUCROC = {aucroc_score}")
                 best_models_win.append(best_model)
                 best_results_win.append(result.best_score_)
+                best_params_win.append(result.best_params_)
             
             best_result_final = max(best_results_win)
             best_model_final = best_models_win[best_results_win.index(best_result_final)]
             best_win = time_windows[best_results_win.index(best_result_final)]
+            best_c = best_params_win[best_results_win.index(best_result_final)]
 
-            print(f"Best Window is {best_win}")
+            print(f"Best Window is {best_win}, (C = {best_c})")
 
             tfr_cropped = crop_tfr(tfr, tmin=best_win[0], tmax=best_win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
             
@@ -401,12 +404,12 @@ if __name__ == "__main__":
                 collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 12, 5, n_time_samples))
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
             else:
-            # take the mean over channels
                 tfr_mean = tfr_cropped.mean(axis=1).squeeze()
                 collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
             
-            # tfr_mean = tfr_cropped.mean(axis=1).squeeze()
+            # tfr_mean = tfr_feature_extract(tfr_cropped)
+            
             X = tfr_mean.reshape(n_trials, -1)
 
             X_test, y_test = X[test_index], y[test_index]

@@ -145,9 +145,9 @@ class ModelTrainer:
 
                 # if patience == 0:
                 #     break
-                print(f'---------------------- Epoch: {epoch} ----------------------')
-                print(f'Training AUC: {train_auroc} | Acc.: {train_balanced_acc} | Loss: {train_loss}')
-                print(f'Validation AUC: {val_auroc} | Acc: {val_balanaced_acc} | Loss: {val_loss}')
+                # print(f'---------------------- Epoch: {epoch} ----------------------')
+                # print(f'Training AUC: {train_auroc} | Acc.: {train_balanced_acc} | Loss: {train_loss}')
+                # print(f'Validation AUC: {val_auroc} | Acc: {val_balanaced_acc} | Loss: {val_loss}')
                 # print(f'lr = {learning_rate}')
                 
                 wandb.log({
@@ -159,6 +159,14 @@ class ModelTrainer:
                     "epoch": epoch,
                 })
 
+        best_model = {
+                        'epoch': epoch,
+                        'model_state_dict': self.model.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'loss': val_loss,
+                        'acc': val_balanaced_acc,
+                        'auroc': val_auroc
+                    }
         print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         # if best_model is None:
         # set the best model to the final model

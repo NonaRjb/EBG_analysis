@@ -3,6 +3,7 @@ from typing import Any
 # from pywt import wavedec
 import mne
 import torch
+import scipy
 import scipy.io as scio
 from scipy.signal import resample
 import mat73
@@ -348,6 +349,29 @@ def apply_tfr(in_data: np.ndarray, fs: float, freqs: np.ndarray, n_cycles: Union
         raise NotImplementedError
 
     return tfr_power
+
+
+def extract_stat_features(signal, axis=2):
+    mean = np.mean(signal, axis=axis, keepdims=True)
+    std = np.std(signal, axis=axis, keepdims=True)
+    skew = scipy.stats.skew(signal, axis=axis, keepdims=True)
+    kurtosis = scipy.stats.kurtosis(signal, axis=axis, keepdims=True)
+    entropy = scipy.stats.entropy(signal, axis=axis, keepdims=True)
+    entropy = np.nan_to_num(entropy, posinf=10, neginf=-10)
+    final_features = np.concatenate((mean, std, skew, kurtosis, entropy), axis=axis)
+    return final_features
+
+
+def tfr_feature_extract(tfr):
+    fb1 = tfr[:, :, :20, :]
+    fb2 = tfr[:, :, 20:40, :]
+    fb3 = tfr[:, :, 40:, :]
+
+    fb1_feutures = extract_stat_features(fb1, axis=2)
+    fb2_features = extract_stat_features(fb2, axis=2)
+    fb3_features = extract_stat_features(fb3, axis=2)
+
+    return np.concatenate((fb1_feutures, fb2_features, fb3_features), axis=1)
 
 
 def strided_convolution(image, weight, stride):

@@ -3,7 +3,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold, GridSearchCV
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve, precision_recall_curve, auc
 from sklearn.model_selection import cross_validate
@@ -280,6 +280,7 @@ def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_l
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, default='ebg4')
+    parser.add_argument('--subject_id', type=int, default=1)
     parser.add_argument('--tmin', type=float, default=-0.5)
     parser.add_argument('--tmax', type=float, default=0.25)
     parser.add_argument('-w', type=float, default=None)
@@ -319,11 +320,6 @@ if __name__ == "__main__":
         if 'random_state' in model_kwargs[k].keys():
             model_kwargs[k]['random_state'] = seed
 
-    # with open(os.path.join(os.path.join(save_path, f"logreg_best_c_{modality1}.pkl")), 'rb') as f:
-    #     best_c_mod1 = pickle.load(f)
-    # with open(os.path.join(os.path.join(save_path, f"logreg_best_c_{modality2}.pkl")), 'rb') as f:
-    #     best_c_mod2 = pickle.load(f)
-
     save_path = os.path.join(save_path, "plots")
     save_path = os.path.join(save_path, "grid_search_c" if w is None else "grid_search_c_tmin")
     os.makedirs(save_path, exist_ok=True)
@@ -332,10 +328,12 @@ if __name__ == "__main__":
     splits_path = os.path.join(data_path, "splits_"+dataset_name)
     data_path = os.path.join(data_path, dataset_name)
 
-    if dataset_name == "ebg1":
+    if dataset_name == "ebg1" and args.subject_id == 0:
         subject_ids = [i for i in range(1, 31) if i != 4]
-    elif dataset_name == "ebg4":
+    elif dataset_name == "ebg4" and args.subject_id == 0:
         subject_ids = [i for i in range(1, 54) if i != 10]
+    elif args.subject_id != 0:
+        subject_ids = [args.subject_id]
     else:
         raise NotImplementedError
 
@@ -392,36 +390,51 @@ if __name__ == "__main__":
         y = np.asarray(labels_array)
 
         # skf = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=seed)
+        outer_cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+
         aucroc_scores[str(subj)] = []
         aucpr_scores = []
 
-        # for fold, (train_index, test_index) in enumerate(skf.split(mod1_features, y)):
-        for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subj)))):
+        for fold, (train_index, test_index) in enumerate(outer_cv.split(mod1_features, y)):
+        # for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subj)))):
 
-            with open(os.path.join(splits_path, str(subj), fold), 'rb') as f:
-                split = pickle.load(f)
-            train_index = split['train']
-            test_index = split['val']
+            # with open(os.path.join(splits_path, str(subj), fold), 'rb') as f:
+            #     split = pickle.load(f)
+            # train_index = split['train']
+            # test_index = split['val']
 
             model_kwargs['logreg']['C'] = c1 # float(best_c_mod1[str(subj)])
-            clf1 = load_ml_model(model_name=args.model, **model_kwargs[args.model])
+            clf1 = load_ml_model(model_name=args.model, modality=modality1, **model_kwargs[args.model])
             model_kwargs['logreg']['C'] = c2 # float(best_c_mod2[str(subj)])
-            clf2 = load_ml_model(model_name=args.model, **model_kwargs[args.model])
+            clf2 = load_ml_model(model_name=args.model, modality=modality2, **model_kwargs[args.model])
 
             X1_train, X1_test = mod1_features[train_index], mod1_features[test_index]
             X2_train, X2_test = mod2_features[train_index], mod2_features[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            # print(f"Fold {fold + 1}:")
-            print(f"Fold {i + 1}:")
-            clf1 = clf1.fit(X1_train, y_train)
-            clf2 = clf2.fit(X2_train, y_train)
+            inner_cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=1, random_state=seed)
 
-            prob1_scores = clf1.predict_proba(X1_test)[:, 1]
-            prob2_scores = clf2.predict_proba(X2_test)[:, 1]
+            space = dict()
+            # space['logreg__C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
+            space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
+            search1 = GridSearchCV(clf1, space, scoring='roc_auc', cv=inner_cv, refit=True)
+            result1 = search1.fit(X1_train, y_train)
+            best_clf1 = result1.best_estimator_
 
-            # fpr1, tpr1, thresholds1 = roc_curve(y_test, prob1_scores)
-            # fpr2, tpr2, thresholds2 = roc_curve(y_test, prob2_scores)
+            space = dict()
+            # space['logreg__C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
+            space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
+            search2 = GridSearchCV(clf2, space, scoring='roc_auc', cv=inner_cv, refit=True)
+            result2 = search2.fit(X2_train, y_train)
+            best_clf2 = result2.best_estimator_
+
+            # # print(f"Fold {fold + 1}:")
+            # print(f"Fold {i + 1}:")
+            # clf1 = clf1.fit(X1_train, y_train)
+            # clf2 = clf2.fit(X2_train, y_train)
+
+            prob1_scores = best_clf1.predict_proba(X1_test)[:, 1]
+            prob2_scores = best_clf2.predict_proba(X2_test)[:, 1]
 
             prob_scores = np.concatenate((np.expand_dims(prob1_scores, axis=1), np.expand_dims(prob2_scores, axis=1)),
                                          axis=1)
@@ -429,14 +442,14 @@ if __name__ == "__main__":
             aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
             aucroc_scores[str(subj)].append(aucroc_score)
 
-            print(f"Model AUCROC = {aucroc_score}")
+            print(f"Test AUCROC = {aucroc_score}")
             print("")
 
+        print("median test auc = ", np.median(np.asarray(aucroc_scores[str(subj)])))        
         if args.save is True:
             print("Saving the AUC Scores")
             os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
             np.save(
-                os.path.join(save_path, str(subj), f"{c1}_{c2}_t{args.tmin}.npy") if w is not None else os.path.join(
-                    save_path, str(subj), f"{c1}_{c2}.npy"),
+                os.path.join(save_path, str(subj), f"{args.tmin}_{args.tmax}.npy"),
                 np.asarray(aucroc_scores[str(subj)])
             )
