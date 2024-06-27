@@ -355,7 +355,7 @@ if __name__ == "__main__":
             name=dataset_name,
             root_path=data_path,
             subject_id=subj,
-            data_type="source" if modality1 == "source" else "sensor_ica",
+            data_type="source" if modality2 == "source" else "sensor_ica",
             modality=modality2,
             tmin=None,
             tmax=None,
@@ -432,17 +432,21 @@ if __name__ == "__main__":
             # print(f"Fold {i + 1}:")
             # clf1 = clf1.fit(X1_train, y_train)
             # clf2 = clf2.fit(X2_train, y_train)
+            sum_aucs = result1.best_score_ + result2.best_score_
+            alpha1 = result1.best_score_ / sum_aucs
+            alpha2 = result2.best_score_ / sum_aucs
 
-            prob1_scores = best_clf1.predict_proba(X1_test)[:, 1]
-            prob2_scores = best_clf2.predict_proba(X2_test)[:, 1]
+            print(f"alpha1 = {alpha1}, alpha2 = {alpha2}")
+            prob1_scores = best_clf1.predict_proba(X1_test)[:, 1] * alpha1
+            prob2_scores = best_clf2.predict_proba(X2_test)[:, 1] * alpha2
 
             prob_scores = np.concatenate((np.expand_dims(prob1_scores, axis=1), np.expand_dims(prob2_scores, axis=1)),
                                          axis=1)
             prob_scores = prob_scores.mean(axis=-1)
             aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-            aucroc_scores[str(subj)].append(aucroc_score)
 
-            print(f"Test AUCROC = {aucroc_score}")
+            aucroc_scores[str(subj)].append(aucroc_score)
+            print(f"Test Weighted AUCROC = {aucroc_score}")
             print("")
 
         print("median test auc = ", np.median(np.asarray(aucroc_scores[str(subj)])))        

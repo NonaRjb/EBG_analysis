@@ -5,6 +5,61 @@ from collections import OrderedDict
 import numpy as np
 
 
+class MultiModalNet(nn.Module):
+    def __init__(self, model1, model2, embed_dim1, embed_dim2, n_classes, device, **kwargs):
+        super(MultiModalNet, self).__init__()
+        self.backbone1 = model1.to(device)
+        self.backbone2 = model2.to(device)
+        self.embed_dim1 = embed_dim1
+        self.embed_dim2 = embed_dim2
+
+        self.model1 = nn.Sequential(*(list(self.backbone1.children())[:-1]))
+        self.model2 = nn.Sequential(*(list(self.backbone2.children())[:-1]))
+
+        self.feature_dim1 = list(self.backbone1.children())[-1].in_features
+        self.feature_dim2 = list(self.backbone2.children())[-1].in_features
+
+        # self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Linear(self.feature_dim1, self.embed_dim1))]))
+        # self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Linear(self.feature_dim2, self.embed_dim2))]))
+        self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
+        self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
+        self.relu = nn.ReLU()
+        self.fc = nn.Linear(in_features=self.feature_dim1+self.feature_dim2, out_features=n_classes)
+
+    def forward(self, x):
+        modality1_embedding = self.model1(x[0])
+        modality2_embedding = self.model2(x[1])
+        modality1_embedding = self.repr_layer1(modality1_embedding)
+        modality2_embedding = self.repr_layer2(modality2_embedding)
+        final_embedding = torch.cat((modality1_embedding, modality2_embedding), dim=-1)
+        final_embedding = self.relu(final_embedding)
+        out = self.fc(final_embedding)
+        return out
+
+
+class MLP(nn.Module):
+    def __init__(self, n_samples, hidden_sizes, n_classes):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(n_samples, hidden_sizes[0])
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
+        self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(hidden_sizes[1], n_classes if n_classes > 2 else 1)
+
+    def forward(self, x):
+
+        if len(x.shape) > 2:
+            batch_size = x.shape[0]
+            x = x.view(batch_size, -1)
+        x = x.squeeze(dim=1)
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        out = self.relu2(out)
+        out = self.fc3(out)
+        return out
+
+
 class EEGNet(nn.Module):
     def __init__(self, n_samples, n_classes, n_channels=96, f1=8, d=2, f2=16, kernel_length=64, dropout_rate=0.5):
         super().__init__()
@@ -77,7 +132,7 @@ class LSTMClassifier(nn.Module):
         self.num_layers = kwargs['num_layers']
 
         self.lstm = LSTM(
-            input_size=kwargs['input_size'],
+            input_size=kwargs['n_channels'],
             hidden_size=kwargs['hidden_size'],
             num_layers=kwargs['num_layers'],
             batch_first=True,
@@ -96,7 +151,7 @@ class LSTMClassifier(nn.Module):
         h_0 = torch.randn(self.num_layers, x.shape[0], self.hidden_size).double().to(self.device)
         c_0 = torch.randn(self.num_layers, x.shape[0], self.hidden_size).double().to(self.device)
 
-        x = x.squeeze(dim=1).permute((0, 2, 1))
+        x = x.permute((0, 2, 1))
         output, (hn, cn) = self.lstm(x, (h_0, c_0))
         # output, hn = self.rnn(x, h_0)
         # final_h = torch.cat((hn[-2, ...], hn[-1, ...]), dim=1)

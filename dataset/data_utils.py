@@ -92,7 +92,7 @@ def load_ebg4(root, subject_id, data_type, **kwargs):
     if data_type == 'source':
         filename = "source_data.mat"
         file = os.path.join(root, str(subject_id), filename)
-        data, labels, time, fs = load_source_ebg4(file)
+        data, labels, time, fs = load_source_ebg4(file, kwargs['fs_new'])
     elif data_type == "sensor":
         filename = "preprocessed_data.mat"
         file = os.path.join(root, str(subject_id), filename)
@@ -155,7 +155,7 @@ def load_sensor_ica_ebg4(filename, fs_new=None):
         return data_resampled, labels, times_new, fs_new
 
 
-def load_source_ebg4(filename):
+def load_source_ebg4(filename, fs_new=None):
     print(f"********** loading source data from {filename} **********")
 
     mat73_files = [i for i in range(21, 54)]
@@ -177,7 +177,14 @@ def load_source_ebg4(filename):
     labels = labels[:, 0]
     time = np.asarray(time)
 
-    return data, labels, time, fs
+    if fs_new is None:
+        return data, labels, time, fs
+    else:
+        # low-pass filter
+        data_filtered = mne.filter.filter_data(data, sfreq=fs, l_freq=None, h_freq=min(120, fs_new/2))
+        times_new = np.arange(-1., np.max(time), 1 / fs_new)
+        data_resampled = resample(data_filtered, num=int(fs_new / fs * data_filtered.shape[-1]), axis=-1)
+        return data_resampled, labels, times_new, fs_new
 
 
 def load_ebg4_sniff(filename, fs_new=None):
@@ -372,6 +379,30 @@ def tfr_feature_extract(tfr):
     fb3_features = extract_stat_features(fb3, axis=2)
 
     return np.concatenate((fb1_feutures, fb2_features, fb3_features), axis=1)
+
+
+def get_channel_split(modality):
+   
+    if modality in ["ebg-sniff", "sniff-ebg"]:
+        # n_channels = 5
+        return 4
+    elif modality in ["eeg-sniff", "sniff-eeg"]:
+        # n_channels = 64
+        return 63
+    elif modality in ['source-sniff', 'sniff-source']:
+        # n_channels = 5
+        return 4
+    elif modality in ['source-ebg', 'ebg-source']:
+        # n_channels = 8
+        return 4
+    elif modality in ['source-eeg', 'eeg-source']:
+        # n_channels = 67
+        return 63
+    elif modality in ['eeg-ebg', 'ebg-eeg']:
+        # n_channels = 67
+        return 63
+    else:
+        raise NotImplementedError
 
 
 def strided_convolution(image, weight, stride):

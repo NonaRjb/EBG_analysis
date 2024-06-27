@@ -124,11 +124,11 @@ class EBG4(Dataset):
             elif modality == 'source-ebg' or modality == 'ebg-source':
                 sensor_data, _, _, _ = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
                 sensor_data = sensor_data[:, 63:-1, :len(time_vec)]
-                source_data = np.concatenate((source_data, sensor_data), axis=1)
+                source_data = np.concatenate((sensor_data, source_data), axis=1)
             elif modality == 'source-eeg' or modality == 'eeg-source':
                 sensor_data, _, _, _ = load_ebg4(root_path, subject, "sensor_ica", fs_new=fs_new)
                 sensor_data = sensor_data[:, :63, :len(time_vec)]
-                source_data = np.concatenate((source_data, sensor_data), axis=1)
+                source_data = np.concatenate((sensor_data, source_data), axis=1)
             else:
                 pass
         
@@ -188,9 +188,9 @@ class EBG4(Dataset):
             print(f"new_labels = {set(new_labels)}")
 
         self.data = self.source_data
-        self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis=(0, -1), keepdims=True)
+        self.baseline = np.mean(self.data[..., self.baseline_min:self.baseline_max], axis= (0, -1), keepdims=True)
+        # self.baseline = np.mean(self.data[..., self.t_min:self.t_max], axis=-1, keepdims=True)
         self.data = self.data[..., self.t_min:self.t_max] - self.baseline
-        # self.data = np.random.randn(*self.data.shape).astype(np.float64)
         self.percentile_95 = np.percentile(np.abs(self.data), 95, axis=-1, keepdims=True)
 
     def __len__(self):
@@ -202,7 +202,7 @@ class EBG4(Dataset):
         sample = self.data[item, ...]
         if self.normalize or self.modality == "sniff":
             sample = sample / self.percentile_95[item, ...]
-        if self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
+        elif self.modality == 'ebg-sniff' or self.modality == 'eeg-sniff':
             sample_normalized = sample / self.percentile_95[item, ...]
             sample[-1, ...] = sample_normalized[-1, ...]
 

@@ -42,7 +42,7 @@ model_kwargs = {
         "max_leaf_nodes": 4,
         "max_depth": 5,
         "min_samples_split": 5,
-        "alpha": 1.0,
+        "ccp_alpha": 1.0,
         "random_state": 42
     },
     'xgboost':{
@@ -262,6 +262,7 @@ if __name__ == "__main__":
     else:
         data_path = cluster_data_path
         save_path = cluster_save_path
+        
 
     args = parse_args()
 
@@ -371,7 +372,11 @@ if __name__ == "__main__":
                 clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
                 space = dict()
                 # space['logreg__C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
-                space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
+                if args.model == "gradboost": 
+                    space[f'{args.model}__n_estimators'] = [50, 100, 150, 200]
+                    space[f'{args.model}__max_depth'] = [3, 5, 7]
+                else:
+                    space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
                 search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True, error_score='raise')
                 result = search.fit(X_train, y_train)
                 best_model = result.best_estimator_

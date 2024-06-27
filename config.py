@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 
 class DNNConfig:
@@ -16,7 +17,7 @@ class DNNConfig:
             'ebg_transform': None,
             'normalize': True,
             'shuffle_labels': False,
-            'modality': 'eeg',
+            'modality': 'ebg-sniff',
             'intensity': False,
             'n_classes': 2,
             'tfr_freqs': np.linspace(20, 100, 160),
@@ -48,11 +49,21 @@ class DNNConfig:
             'eegnet': {'n_channels': 4, 'n_classes': self.data_constants['n_classes']},
             'eegnet1d': {'n_channels': 4, 'n_classes': self.data_constants['n_classes']},
             'eegnet_attention': {'n_channels': 68, 'n_classes': self.data_constants['n_classes']},
-            'lstm': {'input_size': 4, 'hidden_size': 64, 'num_layers': 1, 'dropout': 0.5,
+            'lstm': {'n_channels': 4, 'hidden_size': 128, 'num_layers': 1, 'dropout': 0.0,
                      'n_classes': self.data_constants['n_classes']},
+            'mlp':{'n_samples': 256, 'hidden_sizes': [32, 32], 'n_classes':self.data_constants['n_classes']},
             'rnn': {'input_size': 4, 'hidden_size': 16, 'num_layers': 1, 'dropout': 0.2, 'n_classes': self.data_constants['n_classes']},
             'tfrnet': {},
             'resnet1d': {'n_channels': 4, 'n_samples': 256, 'net_filter_size': [16, 16, 32, 32, 64],
                          'net_seq_length': [256, 64, 32, 16, 8], 'n_classes': self.data_constants['n_classes'], 'kernel_size': 31,
-                         'dropout_rate': 0.5}
+                         'dropout_rate': 0.5},
+        }
+
+        self.model_constants['multimodal'] = {
+            'model1': 'resnet1d', 
+            'model2': 'resnet1d', 
+            'model1_kwargs':copy.deepcopy(self.model_constants['resnet1d']),
+            'model2_kwargs':copy.deepcopy(self.model_constants['resnet1d']),
+            'n_classes': 2,
+            'device': 'cuda'
         }
