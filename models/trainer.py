@@ -4,6 +4,7 @@ from torchmetrics import Accuracy, AUROC
 from sklearn.metrics import balanced_accuracy_score
 import numpy as np
 from tqdm import tqdm
+import copy
 import wandb
 from torch.utils.data import DataLoader
 from torch.cuda.amp import GradScaler, autocast
@@ -64,7 +65,6 @@ class ModelTrainer:
         best_loss = 10000000
         best_acc = 0.0
         patience = self.patience
-        print("Training Started...")
         for epoch in range(self.epochs):
             # print(f"Epoch {epoch}/{self.epochs}.")
             steps = 0
@@ -125,8 +125,8 @@ class ModelTrainer:
                     patience = self.patience
                     best_model = {
                         'epoch': epoch,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'model_state_dict': copy.deepcopy(self.model.state_dict()),
+                        'optimizer_state_dict': copy.deepcopy(self.optimizer.state_dict()),
                         'loss': val_loss,
                         'acc': val_balanaced_acc,
                         'auroc': val_auroc
@@ -161,27 +161,27 @@ class ModelTrainer:
                     "epoch": epoch,
                 })
 
-        best_model = {
-                        'epoch': epoch,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
-                        'loss': val_loss,
-                        'acc': val_balanaced_acc,
-                        'auroc': val_auroc
-                    }
-        print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
-        # if best_model is None:
-        # set the best model to the final model
         # best_model = {
-        #     'epoch': self.epochs,
-        #     'model_state_dict': self.model.state_dict(),
-        #     'optimizer_state_dict': self.optimizer.state_dict(),
-        #     'loss': val_loss,
-        #     'acc': val_balanaced_acc,
-        #     'auroc': val_auroc
-        # }
-
-        #print(f"Final Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        #                 'epoch': epoch,
+        #                 'model_state_dict': copy.deepcopy(self.model.state_dict()),
+        #                 'optimizer_state_dict': copy.deepcopy(self.optimizer.state_dict()),
+        #                 'loss': val_loss,
+        #                 'acc': val_balanaced_acc,
+        #                 'auroc': val_auroc
+        #             }
+        # print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        if best_model is None:
+        # set the best model to the final model
+            best_model = {
+                'epoch': self.epochs,
+                'model_state_dict': copy.deepcopy(self.model.state_dict()),
+                'optimizer_state_dict': copy.deepcopy(self.optimizer.state_dict()),
+                'loss': val_loss,
+                'acc': val_balanaced_acc,
+                'auroc': val_auroc
+            }
+        print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
+        # print(f"Final Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
         
 
         # np.save(os.path.join(self.save_path, "y_true_train.npy"), np.array(self.y_true_train))
@@ -401,10 +401,9 @@ class MultiModalTrainer:
         progress_bar = tqdm(data_loader, disable=True)
         with torch.no_grad():
             for x_all, y in progress_bar:
-                mod1 = x_all[:, :self.ch_split, :]
-                mod2 = x_all[:, self.ch_split:, :]
+                mod1 = x_all[:, :self.ch_split, :].to(self.device)
+                mod2 = x_all[:, self.ch_split:, :].to(self.device)
                 x = (mod1, mod2)
-                x = x.to(self.device)
                 if self.n_classes == 2:
                     y = y.to(self.device)
                 else:

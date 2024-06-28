@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import LSTM, RNN
+from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
 from collections import OrderedDict
 import numpy as np
 
@@ -8,13 +9,25 @@ import numpy as np
 class MultiModalNet(nn.Module):
     def __init__(self, model1, model2, embed_dim1, embed_dim2, n_classes, device, **kwargs):
         super(MultiModalNet, self).__init__()
+
+        self.backbone1_name = kwargs['model1_name']
+        self.backbone2_name = kwargs['model2_name']
+
         self.backbone1 = model1.to(device)
         self.backbone2 = model2.to(device)
         self.embed_dim1 = embed_dim1
         self.embed_dim2 = embed_dim2
 
-        self.model1 = nn.Sequential(*(list(self.backbone1.children())[:-1]))
-        self.model2 = nn.Sequential(*(list(self.backbone2.children())[:-1]))
+        # print(get_graph_node_names(self.backbone1))
+
+        if kwargs['model1_name'] == "resnet1d":
+            self.model1 = create_feature_extractor(self.backbone1, return_nodes=['view'])
+        else:
+            self.model1 = nn.Sequential(*(list(self.backbone1.children())[:-1]))
+        if kwargs['model2_name'] == "resnet1d":
+            self.model2 = create_feature_extractor(self.backbone2, return_nodes=['view'])
+        else:
+            self.model2 = nn.Sequential(*(list(self.backbone2.children())[:-1]))
 
         self.feature_dim1 = list(self.backbone1.children())[-1].in_features
         self.feature_dim2 = list(self.backbone2.children())[-1].in_features
@@ -24,11 +37,18 @@ class MultiModalNet(nn.Module):
         self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
         self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
         self.relu = nn.ReLU()
-        self.fc = nn.Linear(in_features=self.feature_dim1+self.feature_dim2, out_features=n_classes)
+        self.fc = nn.Linear(in_features=self.feature_dim1 + self.feature_dim2,
+                            out_features=n_classes if n_classes > 2 else 1)
 
     def forward(self, x):
-        modality1_embedding = self.model1(x[0])
-        modality2_embedding = self.model2(x[1])
+        if self.backbone1_name == "resnet1d":
+            modality1_embedding = self.model1(x[0])['view']
+        else:
+            modality1_embedding = self.model1(x[0])
+        if self.backbone2_name == "resnet1d":
+            modality2_embedding = self.model2(x[1])['view']
+        else:
+            modality2_embedding = self.model2(x[1])
         modality1_embedding = self.repr_layer1(modality1_embedding)
         modality2_embedding = self.repr_layer2(modality2_embedding)
         final_embedding = torch.cat((modality1_embedding, modality2_embedding), dim=-1)

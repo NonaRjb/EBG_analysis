@@ -115,7 +115,7 @@ def train_subject(subject_data):
                 )
     data_dummy.labels = np.array(data_dummy.labels)
 
-    metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': [], 'val_auroc': []}
+    metrics = {'loss': [], 'acc': [], 'auroc': [], 'epoch': [], 'test_auroc': []}
     # for i, fold in enumerate(os.listdir(os.path.join(splits_path, str(subject)))):
     for i, (train_all_index, test_index) in enumerate(outer_cv.split(data_dummy.data, data_dummy.labels)):
         best_models = []
@@ -150,10 +150,9 @@ def train_subject(subject_data):
             best_models_win = []
             for j, (train_index, val_index) in enumerate(inner_cv.split(data_dummy.data[train_all_index], data_dummy.labels[train_all_index])):
             
-
                 train_index = train_all_index[train_index]
                 val_index = train_all_index[val_index]
-                
+                    
                 train_sub_sampler = torch.utils.data.SubsetRandomSampler(train_index, generator=g)
                 val_sub_sampler = torch.utils.data.SubsetRandomSampler(val_index, generator=g)
                 # Create DataLoader for training and validation
@@ -161,7 +160,7 @@ def train_subject(subject_data):
                 val_loader = DataLoader(data, batch_size=batch_size, sampler=val_sub_sampler, drop_last=False)
 
                 model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
-                
+                    
                 model = model.double()
                 optim = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=True)
                 if scheduler_name == 'plateau':
@@ -172,7 +171,6 @@ def train_subject(subject_data):
                                                                         patience=constants.training_constants['patience'],
                                                                         min_lr=0.1 * 1e-7,
                                                                         factor=0.1)
-
                 elif scheduler_name == 'multistep':
                     scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[16, 64, 256],
                                                                     gamma=0.1)
@@ -195,102 +193,39 @@ def train_subject(subject_data):
                                         weights=None, device=device, scheduler=scheduler, warmup=None,
                                         warmup_steps=constants.training_constants['warmup_steps'], batch_size=batch_size)
                 best_model = trainer.train(train_loader, val_loader)
-                best_models_win.append(best_model)
 
-            
-            # best_res_win = None
-            # sum_aucs = 0
-            # for m in best_models_win:
-            #     sum_aucs += m['auroc'].detach().numpy()
-            #     if best_res_win is None:
-            #         best_res_win = m['auroc']
-            #         best_model_win = m
-            #     if m['auroc'] > best_res_win:
-            #         best_res_win = m['auroc']
-            #         best_model_win = m
-            best_models.append(best_models_win)
-            best_windows.append(win)
-            median_windows.append(np.median(np.asarray([m['auroc'] for m in best_models_win])))
-        
-        best_res_final = None
-        for n, r in enumerate(median_windows):
-            if best_res_final is None or r > best_res_final:
-                best_res_final = r
-                best_models_final = best_models[n]
-                best_window = best_windows[n]
+                # best_models_win.append(best_model)
+                # best_models.append(best_models_win)
+                # best_windows.append(win)
+                # median_windows.append(np.median(np.asarray([m['auroc'] for m in best_models_win])))
 
-        # for n, m in enumerate(best_models):
-        #     if best_res_final is None or m['auroc'] > best_res_final:
-        #         best_res_final = m['auroc']
-        #         best_model_final = m
-        #         best_window = best_windows[n]
+                test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_index, generator=g)
+                test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
 
-        
-        data = EBG4(
-                root_path=os.path.join(paths['eeg_data'], "ebg4"),
-                source_data=data_array, label=labels_array, time_vec=t, fs=sfreq, 
-                tmin=best_window[0], tmax=best_window[1], w=None, binary=constants.data_constants['binary'],
-                data_type=data_type, modality=constants.data_constants["modality"], intensity=constants.data_constants['intensity'],
-                pick_subjects=subject, fs_new=constants.data_constants['fs_new'], 
-                normalize=constants.data_constants['normalize'], transform=None
-                )
+                new_model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
+                new_model = new_model.double()
+                new_model.to(device)
+                new_model.load_state_dict(best_model['model_state_dict'])
+                new_model.eval()
+                test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(new_model, test_loader)
 
-        test_sub_sampler = torch.utils.data.SubsetRandomSampler(test_index, generator=g)
-        test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
+                metrics['auroc'].append(best_model['auroc'])
+                metrics['test_auroc'].append(test_auroc)
+                metrics['loss'].append(best_model['loss'])
+                metrics['acc'].append(best_model['acc'])
+                metrics['epoch'].append(best_model['epoch'])
 
-        sum_aucs = np.sum(np.asarray([m['auroc'].detach().numpy() for m in best_models_final]))
-        
-        progress_bar = tqdm(test_loader, disable=True)
-        prob_scores = []
-        y_test = []
-        for x, y in progress_bar:
-            x = x.to(device)
-            y = y.to(device)
-            
-            batch_res = None
-            for m in best_models_final:
-                alpha = m['auroc'].detach().numpy() / sum_aucs
-                model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
-                model = model.double()
-                model.to(device)
-                model.load_state_dict(m['model_state_dict'])
-                model.eval()
-                with torch.no_grad():
-                    preds = model(x)
-                if batch_res is None:
-                    batch_res = alpha * torch.sigmoid(preds).detach().cpu().numpy()
-                else:
-                    batch_res = np.concatenate((batch_res, alpha * torch.sigmoid(preds).detach().cpu().numpy()), axis=1)
+                print(f"Best Validation AUC = {best_model['auroc']} (epoch = {best_model['epoch']}) |  Best Test AUC = {test_auroc}")
 
-            y_test.extend(y.detach().cpu().numpy())
-            prob_scores.extend([np.sum(batch_res, axis=1)])
-
-        ensemble_test_auroc = roc_auc_score(np.asarray(y_test), np.asarray(prob_scores).squeeze(), average='weighted')
-        print(f"Ensemble Test AUC Score = {ensemble_test_auroc}")
-
-        # model = load_model.load(eeg_enc_name, **constants.model_constants[eeg_enc_name])
-        # model = model.double()
-        # model.to(device)
-        # model.load_state_dict(best_model_final['model_state_dict'])
-        # model.eval()
-        # test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, test_loader)
-        # # test_loss, test_acc, test_auroc, y_true_test, y_pred_test = trainer.evaluate(model, val_loader)
-        # print(f"Best Window is {best_window}")
-        # print(
-        #     f"Best Val Loss = {best_model_final['loss']}, AUC Score = {best_model_final['auroc']} (Epoch = {best_model_final['epoch']})")
-        # print(f"Test AUC Score = {test_auroc}")
-        metrics['auroc'].append(ensemble_test_auroc)
-        metrics['loss'].append(np.mean(np.asarray([m['loss'] for m in best_models_final])))
-        metrics['acc'].append(np.mean(np.asarray([m['acc'] for m in best_models_final])))
-        metrics['epoch'].append(np.mean(np.asarray([m['epoch'] for m in best_models_final])))
-        del model
-    with open(os.path.join(paths['save_path'], f'{best_window[0]}_{best_window[1]}.pkl'),
+    with open(os.path.join(paths['save_path'], f'{time_windows[0][0]}_{time_windows[0][1]}.pkl'),
             'wb') as f:
         pickle.dump(metrics, f)
     
-    print("Median AUC = ", np.median(np.asarray(metrics['auroc'])))
-    print("Average AUC = ", np.mean(np.asarray(metrics['auroc'])))
+    print("Median VAL AUC = ", np.median(np.asarray(metrics['auroc'])))
+    print("Average VAL AUC = ", np.mean(np.asarray(metrics['auroc'])))
 
+    print("\nMedian TEST AUC = ", np.median(np.asarray(metrics['test_auroc'])))
+    print("Average TEST AUC = ", np.mean(np.asarray(metrics['test_auroc'])))
 
 def seed_everything(seed_val):
     np.random.seed(seed_val)
