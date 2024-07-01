@@ -529,22 +529,36 @@ def compare_logreg_c_tmin(root_path, save_path, modality):
     return
 
 
-def compare_logreg_c(root_path, save_path, modality):
+def compare_logreg_c(root_path, save_path, modality, file_type='npy'):
     subjects = os.listdir(root_path)
     best_scores = {}
 
     for subject in subjects:
 
         for filename in os.listdir(os.path.join(root_path, subject)):
-            best_scores[subject] = np.load(os.path.join(root_path, subject, filename))
+            if file_type == "npy":
+                best_scores[subject] = np.load(os.path.join(root_path, subject, filename))
+            else:
+                with open(os.path.join(root_path, subject, filename), 'rb') as f:
+                    best_scores[subject] = pickle.load(f)
 
     with open(os.path.join(save_path, f"scores_subject_{modality}.pkl"), 'wb') as f:
         pickle.dump(best_scores, f)
 
-    horizontal_bar_subject(best_scores, modality, "logreg", save_path)
+    if file_type == "npy":
+        horizontal_bar_subject(best_scores, modality, "logreg", save_path)
+        mean_score = np.mean(np.asarray([np.mean(best_scores[str(subject)]) for subject in subjects]))
+        print("Average test AUC = ", mean_score)
+    else:
+        val_mean_score = np.mean(np.asarray([np.mean(best_scores[str(subject)]['val']) for subject in subjects]))
+        val_std_err = np.std(np.asarray([np.mean(best_scores[str(subject)]['val']) for subject in subjects]))\
+                      / np.sqrt(len(best_scores.keys()))
+        test_mean_score = np.mean(np.asarray([np.mean(best_scores[str(subject)]['test']) for subject in subjects]))
+        test_std_err = np.std(np.asarray([np.mean(best_scores[str(subject)]['test']) for subject in subjects])) \
+                      / np.sqrt(len(best_scores.keys()))
 
-    mean_score = np.mean(np.asarray([np.mean(best_scores[str(subject)]) for subject in subjects]))
-    print("Median test AUC = ", mean_score)
+        print(f"Val Average AUC = {val_mean_score} (stderr = {val_std_err})")
+        print(f"Test Average AUC = {test_mean_score} (stderr = {test_std_err})")
 
     return
 
@@ -632,8 +646,9 @@ def plot_dnn_res(root_path, save_path, modality):
     plt.axhline(y=0.5, color='r', linestyle='--')
     plt.savefig(
         os.path.join(save_path, f"auc_box_plot_resnet1d_{modality}_all.svg"))
-    print(f"Average of best performances: {np.mean(metrics)}")
-    print(f"Average of best performances: {np.mean(test_metrics)}")
+    print(f"Average of best performances: {np.mean(metrics)} (stderr = {np.std(metrics)/np.sqrt(len(metrics))})")
+    print(f"Average of best performances: {np.mean(test_metrics)} "
+          f"(stderr = {np.std(test_metrics)/np.sqrt(len(test_metrics))})")
     np.save(os.path.join(save_path, f"eegnet1d_ebg4_whole_{modality}.npy"), metrics)
 
 
@@ -682,21 +697,21 @@ if __name__ == "__main__":
     task = "plot_dnn_res"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/sniff_plots/"
-        compare_logreg_c(path_to_data, path_to_save, "sniff")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_kfold/sniff/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_kfold/sniff_plots/"
+        compare_logreg_c(path_to_data, path_to_save, "sniff", 'pkl')
     elif task == "compare_logreg_c_tmin":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_eeg_logreg/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_eeg_logreg_plots/"
         compare_logreg_c_tmin(path_to_data, path_to_save, "eeg")
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win_kfold/ebg4_resnet1d_ebg/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win_kfold/ebg4_resnet1d_ebg_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "ebg")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win_multimodal/ebg4_multimodal_source-eeg/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win_multimodal/ebg4_multimodal_source-eeg_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "source-eeg")
     elif task == "plot_dnn_win_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_source/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_source_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "source")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_ebg/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_ebg_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "ebg")
     elif task == "subject_modality_scatter_logreg":
         path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_logreg_plots/" \
                       "scores_subject_eeg.pkl"
@@ -734,8 +749,8 @@ if __name__ == "__main__":
                         "scores_subjects_eegnet1d_sniff.pkl"
         path_to_source = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/ebg4_resnet1d_source_plots/" \
                          "scores_subjects_eegnet1d_source.pkl"
-        # path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/"
-        path_to_save = None
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/"
+        # path_to_save = None
         bars_whole, df_whole = scatterplot(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_save,
                                            "resnet1d", [14, 37, 9, 45])
         path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_eeg_plots/" \
@@ -746,12 +761,12 @@ if __name__ == "__main__":
                         "scores_subjects_eegnet1d_sniff.pkl"
         path_to_source = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_source_plots/" \
                          "scores_subjects_eegnet1d_source.pkl"
-        # path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win"
-        path_to_save = None
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win"
+        # path_to_save = None
         bars_crop, df_crop = scatterplot(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_save,
                                          "resnet1d", [14, 37, 9, 45])
-        # path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
-        path_to_save = None
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/"
+        # path_to_save = None
         compare_whole_crop(bars_whole, bars_crop, "eegnet1d", path_to_save)
     elif task == "subject_multimodal_scatter_logreg":
         path_to_eeg = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_eeg_logreg_plots/" \
@@ -832,8 +847,8 @@ if __name__ == "__main__":
         bars_logreg, df_logreg = scatterplot(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_save,
                                              "logreg", [4, 10, 13, 35])
 
-        # path_to_save = "/Volumes/T5 EVO/Smell/plots/"
-        path_to_save = None
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/"
+        # path_to_save = None
         compare_models(bars_dnn, bars_logreg, df_dnn, df_logreg, save_path=path_to_save)
 
         compare_within_subject(df_dnn, [22, 14, 38, 45, 49], path_to_save, "ResNet-1D")
