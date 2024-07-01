@@ -174,7 +174,9 @@ def load_ebg4_array(root_path, subject_id, data_type, modality, tmin, tmax, bl_l
     fs = None
     for subject in subjects:
         data_subj, labels_subj, time_vec_subj, fs_subj = \
-            load_ebg4(root=root_path, subject_id=subject, data_type=data_type, fs_new=256) #TODO
+            load_ebg4(root=root_path, subject_id=subject, 
+                      data_type=modality if modality == "sniff" else data_type, 
+                      fs_new=200 if modality == "sniff" else 256) #TODO
         if fs is None:
             fs = float(fs_subj)
 
@@ -332,67 +334,13 @@ if __name__ == "__main__":
 
         outer_cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
         # outer_cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=2, random_state=seed)
-
-        aucroc_scores[str(subj)] = []
+        win = (args.tmin, args.tmax)
+        aucroc_scores[str(subj)] = {'val':[], 'test':[]}
         for fold, (train_index, test_index) in enumerate(outer_cv.split(data, y)):
             best_models_win = []
             best_results_win = []
             best_params_win = []
-            for win in time_windows:
-                tfr_cropped = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
-                # data_array = crop_temporal(data_array, win[0], win[1], t)
-
-                n_time_samples = tfr_cropped.shape[-1]
-                if args.data_type == "source":
-                    collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 4, 12, 5, n_time_samples))
-                    tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
-                elif args.modality == "eeg":
-                    collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 12, 5, n_time_samples))
-                    tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
-                else:
-                # take the mean over channels
-                    tfr_mean = tfr_cropped.mean(axis=1).squeeze()
-                    collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
-                    tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
-            
-                # tfr_mean = tfr_feature_extract(tfr_cropped)
-                
-                X = tfr_mean.reshape(n_trials, -1)
-                X_train, y_train = X[train_index], y[train_index]
-
-                inner_cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=1, random_state=seed)
-                clf = load_ml_model(model_name=args.model, **model_kwargs[args.model])
-                space = dict()
-                # space['logreg__C'] = [0.5, 1, 2, 4, 8, 16, 32, 64]
-                if args.model == "gradboost": 
-                    space[f'{args.model}__n_estimators'] = [50, 100, 150, 200]
-                    space[f'{args.model}__max_depth'] = [3, 5, 7]
-                else:
-                    space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
-                search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True, error_score='raise')
-                result = search.fit(X_train, y_train)
-                best_model = result.best_estimator_
-                # evaluate model on the hold out dataset
-                # prob_scores = best_model.predict_proba(X_test)[:, 1]
-                # clf = clf.fit(X_train, y_train)
-                # prob_scores = clf.predict_proba(X_test)[:, 1]
-                # aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-                # aucroc_scores.append(aucroc_score)
-                # print('>acc=%.3f, est=%.3f, cfg=%s' % (aucroc_score, result.best_score_, result.best_params_))
-                # print(f"Model AUCROC = {aucroc_score}")
-                best_models_win.append(best_model)
-                best_results_win.append(result.best_score_)
-                best_params_win.append(result.best_params_)
-            
-            best_result_final = max(best_results_win)
-            best_model_final = best_models_win[best_results_win.index(best_result_final)]
-            best_win = time_windows[best_results_win.index(best_result_final)]
-            best_c = best_params_win[best_results_win.index(best_result_final)]
-
-            print(f"Best Window is {best_win}, (C = {best_c})")
-
-            tfr_cropped = crop_tfr(tfr, tmin=best_win[0], tmax=best_win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
-            
+            tfr_cropped = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
             n_time_samples = tfr_cropped.shape[-1]
             if args.data_type == "source":
                 collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 4, 12, 5, n_time_samples))
@@ -401,27 +349,39 @@ if __name__ == "__main__":
                 collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 12, 5, n_time_samples))
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
             else:
+            # take the mean over channels
                 tfr_mean = tfr_cropped.mean(axis=1).squeeze()
                 collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
             
-            # tfr_mean = tfr_feature_extract(tfr_cropped)
-            
             X = tfr_mean.reshape(n_trials, -1)
-
+            X_train, y_train = X[train_index], y[train_index]
             X_test, y_test = X[test_index], y[test_index]
 
-            prob_scores = best_model_final.predict_proba(X_test)[:, 1]
-            aucroc_score = roc_auc_score(y_test, prob_scores, average='weighted')
-            aucroc_scores[str(subj)].append(aucroc_score)
+            inner_cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=1, random_state=seed)
+            clf = load_ml_model(model_name=args.model, modality=args.modality, **model_kwargs[args.model])
+            space = dict()
+            if args.model == "gradboost": 
+                space[f'{args.model}__n_estimators'] = [50, 100, 150, 200]
+                space[f'{args.model}__max_depth'] = [3, 5, 7]
+            else:
+                space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
+            search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True, error_score='raise')
+            result = search.fit(X_train, y_train)
+            best_model = result.best_estimator_
 
-            print(f"Best Model's:  Val Score = {best_result_final}, Test Score = {aucroc_score}")
+            prob_scores = best_model.predict_proba(X_test)[:, 1]
+            test_auroc = roc_auc_score(y_test, prob_scores, average='weighted')
+            
+            print(f"Val AUC = {result.best_score_} | Test AUC = {test_auroc}")
 
-        print(f"Median AUC: {np.median(np.asarray(aucroc_scores[str(subj)]))}")
+            aucroc_scores[str(subj)]['val'].append(result.best_score_)
+            aucroc_scores[str(subj)]['test'].append(test_auroc)
+            
+        print(f"Average Val AUC: {np.median(np.asarray(aucroc_scores[str(subj)]['val']))}")
+        print(f"Average Test AUC: {np.median(np.asarray(aucroc_scores[str(subj)]['test']))}")
         if args.save is True:
                 print("Saving the AUC Scores")
                 os.makedirs(os.path.join(save_path, str(subj)), exist_ok=True)
-                np.save(
-                    os.path.join(save_path, str(subj), f"{best_win[0]}_{best_win[1]}.npy"),
-                    np.asarray(aucroc_scores[str(subj)])
-                )
+                with open(os.path.join(save_path, str(subj), f"{win[0]}_{win[1]}.pkl"), 'wb') as f:
+                    pickle.dump(aucroc_scores[str(subj)], f)

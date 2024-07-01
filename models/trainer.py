@@ -353,8 +353,8 @@ class MultiModalTrainer:
                     patience = self.patience
                     best_model = {
                         'epoch': epoch,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'model_state_dict': copy.deepcopy(self.model.state_dict()),
+                        'optimizer_state_dict': copy.deepcopy(self.optimizer.state_dict()),
                         'loss': val_loss,
                         'acc': val_balanaced_acc,
                         'auroc': val_auroc
@@ -379,14 +379,15 @@ class MultiModalTrainer:
                     "epoch": epoch,
                 })
 
-        best_model = {
-                        'epoch': epoch,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
-                        'loss': val_loss,
-                        'acc': val_balanaced_acc,
-                        'auroc': val_auroc
-                    }
+        if best_model is None:
+            best_model = {
+                            'epoch': epoch,
+                            'model_state_dict': copy.deepcopy(self.model.state_dict()),
+                            'optimizer_state_dict': copy.deepcopy(self.optimizer.state_dict()),
+                            'loss': val_loss,
+                            'acc': val_balanaced_acc,
+                            'auroc': val_auroc
+                        }
         print(f"Best Validation AUC Score = {best_model['auroc']} (Epoch = {best_model['epoch']})")
      
 

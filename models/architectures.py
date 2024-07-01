@@ -32,12 +32,14 @@ class MultiModalNet(nn.Module):
         self.feature_dim1 = list(self.backbone1.children())[-1].in_features
         self.feature_dim2 = list(self.backbone2.children())[-1].in_features
 
-        # self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Linear(self.feature_dim1, self.embed_dim1))]))
-        # self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Linear(self.feature_dim2, self.embed_dim2))]))
-        self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
-        self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
+        self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Linear(self.feature_dim1, self.embed_dim1))]))
+        self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Linear(self.feature_dim2, self.embed_dim2))]))
+        # self.repr_layer1 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
+        # self.repr_layer2 = nn.Sequential(OrderedDict([('lnout', nn.Identity())]))
         self.relu = nn.ReLU()
-        self.fc = nn.Linear(in_features=self.feature_dim1 + self.feature_dim2,
+        # self.fc = nn.Linear(in_features=self.feature_dim1 + self.feature_dim2,
+        #                     out_features=n_classes if n_classes > 2 else 1)
+        self.fc = nn.Linear(in_features=self.embed_dim1 + self.embed_dim2,
                             out_features=n_classes if n_classes > 2 else 1)
 
     def forward(self, x):

@@ -26,5 +26,5 @@ subject_id=${s_array[`expr $((SLURM_ARRAY_TASK_ID-1)) % ${#s_array[@]}`]}
 
 # python3 -m debugpy --listen 0.0.0.0:5678 --wait-for-client train_logistic_reg.py --subject_id 0 --data ebg4 --data_type sensor_ica --modality ebg --tmin -0.5 \
 # --tmax 1.5 --fmin 10 --fmax 70 -c 1 --seed 42 --save
-python3 train_logistic_reg.py --subject_id "$subject_id" --data ebg4 --data_type sensor_ica --modality ebg --tmin 0.0 \
+python3 train_logreg_kfold.py --subject_id "$subject_id" --data ebg4 --data_type sensor_ica --modality sniff --tmin 0.0 \
 --tmax 1.0 --fmin 10 --fmax 70 -c 1.0 --model logreg --task "grid_search_c" --seed 42 --save

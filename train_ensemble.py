@@ -19,7 +19,7 @@ from config import DNNConfig
 # from dataset import load_data
 from models.trainer import ModelTrainer, MultiModalTrainer
 import models.load_model as load_model
-from dataset.data_utils import RandomNoise, RandomMask, TemporalJitter, load_ebg4
+from dataset.data_utils import RandomNoise, RandomMask, TemporalJitter, load_ebg4, get_channel_split
 from dataset.ebg4 import EBG4
 
 
@@ -42,7 +42,7 @@ data_transforms = transforms.Compose([
 ])
 channel_dict = {
     'ebg': 4,
-    'eeg': 64,
+    'eeg': 63,
     'source': 4,
     'sniff': 1
 }
@@ -239,12 +239,19 @@ def train_subject(subject_data):
         test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sub_sampler, drop_last=False)
 
         sum_aucs = np.sum(np.asarray([m['auroc'].detach().numpy() for m in best_models_final]))
-        
+
         progress_bar = tqdm(test_loader, disable=True)
         prob_scores = []
         y_test = []
-        for x, y in progress_bar:
-            x = x.to(device)
+        for x_all, y in progress_bar:
+
+            if "multimodal" in task: 
+                ch_split = get_channel_split(constants.data_constants["modality"])
+                mod1 = x_all[:, :ch_split, :].to(device)
+                mod2 = x_all[:, ch_split:, :].to(device)
+                x = (mod1, mod2)
+            else:
+                x = x_all.to(device)
             y = y.to(device)
             
             batch_res = None
@@ -466,6 +473,11 @@ def main():
         constants.model_constants['multimodal']['model1_kwargs'] = copy.deepcopy(constants.model_constants[args.model1])
         constants.model_constants['multimodal']['model2_kwargs'] = copy.deepcopy(constants.model_constants[args.model2])
         modality_all = constants.data_constants["modality"]
+        # TODO fails when having source-eeg and source-ebg instead of eeg-source and ebg-source
+        if modality_all == "source-eeg":
+            modality_all = "eeg-source"
+        if modality_all == "source-ebg":
+            modality_all = "ebg-source"
         modality1, modality2 = modality_all.split('-')
         if "n_channels" in constants.model_constants['multimodal']['model1_kwargs'].keys():
             constants.model_constants['multimodal']['model1_kwargs']['n_channels'] = channel_dict[modality1]

@@ -27,8 +27,12 @@ def load(model_name: str, **kwargs):
     elif model_name == 'multimodal':
         model1 = load(kwargs['model1'], **kwargs['model1_kwargs'])
         model2 = load(kwargs['model2'], **kwargs['model2_kwargs'])
-        return MultiModalNet(model1, model2, embed_dim1=32, embed_dim2=32, n_classes=kwargs['n_classes'], 
-                             device=kwargs['device'], model1_name=kwargs['model1'], model2_name=kwargs['model2'])
+        return MultiModalNet(model1, model2, embed_dim1=kwargs['embed_dim1'], 
+                             embed_dim2=kwargs['embed_dim2'], 
+                             n_classes=kwargs['n_classes'], 
+                             device=kwargs['device'], 
+                             model1_name=kwargs['model1'], 
+                             model2_name=kwargs['model2'])
     else:
         raise NotImplementedError
 

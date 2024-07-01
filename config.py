@@ -17,7 +17,7 @@ class DNNConfig:
             'ebg_transform': None,
             'normalize': True,
             'shuffle_labels': False,
-            'modality': 'sniff',
+            'modality': 'source-ebg',
             'intensity': False,
             'n_classes': 2,
             'tfr_freqs': np.linspace(20, 100, 160),
@@ -64,6 +64,8 @@ class DNNConfig:
             'model2': 'resnet1d', 
             'model1_kwargs':copy.deepcopy(self.model_constants['resnet1d']),
             'model2_kwargs':copy.deepcopy(self.model_constants['resnet1d']),
+            'embed_dim1': 64,
+            'embed_dim2': 32,
             'n_classes': 2,
             'device': 'cuda'
         }
