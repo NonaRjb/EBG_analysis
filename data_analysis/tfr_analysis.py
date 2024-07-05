@@ -1,66 +1,75 @@
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 from dataset import data_utils
-from dataset.load_data import load_ebg1_ml
+from dataset.data_utils import apply_tfr, apply_baseline, crop_tfr
+from train_logistic_reg import load_ebg4_array
 
-
+# cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+# cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
 cluster_data_path = '/local_storage/datasets/nonar/ebg/'
 cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-local_data_path = "/Users/nonarajabi/Desktop/KTH/Smell/Novel_Bulb_measure/data/"
-local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
-
+local_data_path = "/Volumes/T5 EVO/Smell/"
+local_save_path = "/Volumes/T5 EVO/Smell/"
 
 if __name__ == "__main__":
-    ebg_all, time_vec, fs = load_ebg1_ml(root_path=local_data_path, tmin=-1., tmax=1.)
-    fs = fs.astype(float)
+    subjects = [s for s in np.arange(1, 53) if s != 10]
+    fmin = 10
+    fmax = 70
+    tmin = 0.0
+    tmax = 1.0
 
-    baseline_min = np.abs(time_vec - (-.5)).argmin()
-    baseline_max = np.abs(time_vec - (-.2)).argmin()
+    tfr_0s = None
+    tfr_1s = None
+    for subject in subjects:
+        data_array, labels, time_vec, fs = load_ebg4_array(
+            os.path.join(local_data_path, "ebg4"),
+            subject_id=subject,
+            data_type="sensor_ica",
+            modality="ebg",
+            tmin=None, tmax=None,
+            bl_lim=None)
 
-    tfr_freqs = np.linspace(20, 100, 160)
-    gamma_band = (55, 65)
-    gamma_band_min = np.abs(tfr_freqs - gamma_band[0]).argmin()
-    gamma_band_max = np.abs(tfr_freqs - gamma_band[1]).argmin()
+        labels = np.asarray(labels)
 
-    t_min_list = np.linspace(0.0, 0.2, 4)
-    window_size = 0.05
+        freqs = np.arange(5, 100)
+        tfr = apply_tfr(data_array, fs, freqs=freqs, n_cycles=7, method='morlet')
+        tfr = apply_baseline(tfr, bl_lim=(-1.0, -0.6), tvec=time_vec, mode='logratio')
+        tfr = crop_tfr(tfr, tmin=tmin, tmax=tmax, fmin=fmin, fmax=fmax, tvec=time_vec,
+                       freqs=freqs, w=None)
+        tfr = np.mean(tfr, axis=1)  # average over channels
 
-    for subj in ebg_all.keys():
+        class0 = np.where(labels == 0.)
+        class1 = np.where(labels == 1.)
 
-        print(f"------- Subject {subj} -------")
-        ebg_data = ebg_all[subj]['ebg']
-        ebg_labels = ebg_all[subj]['label']
-        # ebg_data = ebg_data[..., t_min:t_max]
+        tfr_1 = np.squeeze(tfr[class1, ...], axis=0)  # clean air trials
+        tfr_0 = np.squeeze(tfr[class0, ...], axis=0)  # odor trials
 
-        class0 = np.where(ebg_labels == 0.)
-        class1 = np.where(ebg_labels == 1.)
+        tfr_1_mean = np.mean(tfr_1, axis=0)
+        tfr_0_mean = np.mean(tfr_0, axis=0)
 
-        ebg_data = data_utils.apply_tfr(ebg_data, fs, tfr_freqs)
-        ebg_baseline = np.mean(ebg_data[..., baseline_min:baseline_max], axis=(0, -1), keepdims=True)
-        ebg_data = 10 * np.log10(ebg_data/ebg_baseline)
-        ebg_data = np.mean(ebg_data, axis=1)
-        # ebg_data = (ebg_data - np.min(ebg_data))/(np.max(ebg_data) - np.min(ebg_data))
+        if tfr_0s is None:
+            tfr_0s = np.expand_dims(tfr_0_mean, axis=0)
+        else:
+            tfr_0s = np.vstack((tfr_0s, np.expand_dims(tfr_0_mean, axis=0)))
 
-        fig, axs = plt.subplots(1, 4, figsize=(30, 10))
-        axs = axs.flatten()
+        if tfr_1s is None:
+            tfr_1s = np.expand_dims(tfr_1_mean, axis=0)
+        else:
+            tfr_1s = np.vstack((tfr_1s, np.expand_dims(tfr_1_mean, axis=0)))
 
-        for i, t_min in enumerate(t_min_list):
+    tfr_0s_mean = np.squeeze(np.mean(tfr_0s, axis=0))
+    tfr_1s_mean = np.squeeze(np.mean(tfr_1s, axis=0))
 
-            t_max = t_min + window_size
-            tmin = np.abs(time_vec - t_min).argmin()
-            tmax = np.abs(time_vec - t_max).argmin()
-            ebg_window = np.mean(ebg_data[:, gamma_band_min:gamma_band_max, tmin:tmax], axis=(-1))
-            ebg_window = np.amax(ebg_window, axis=-1)
-            # ebg_window = np.median(ebg_window, axis=-1)
-            ebg_window_0 = ebg_window[class0, ...].flatten()
-            ebg_window_1 = ebg_window[class1, ...].flatten()
+    diff = tfr_0s_mean - tfr_1s_mean
 
-            axs[i].hist(ebg_window_0, label='class 0', alpha=0.5, density=True, histtype="stepfilled", bins=10)
-            axs[i].hist(ebg_window_1, label='class 1', alpha=0.5, density=True, histtype="stepfilled", bins=10)
-            axs[i].set_title('window '+'{:.2f}'.format(t_min)+'-'+'{:.2f}'.format(t_max))
-            axs[i].legend()
+    yticks = np.arange(fmin, fmax + 1, 10)
+    yticks = [str(t) for t in yticks]
+    # xticks = np.arange(tmin, tmax+0.1, 0.1)
+    # xticks = [str(t) for t in xticks]
 
-        plt.suptitle(f'subject {subj}')
-        plt.show()
-
-
+    plt.imshow(diff, cmap='seismic')
+    plt.colorbar()
+    plt.yticks(ticks=np.arange(0, len(diff)+1, 10), labels=yticks)
+    # plt.xticks(ticks=np.arange(0, diff.shape[-1]+1, ))
+    plt.show()

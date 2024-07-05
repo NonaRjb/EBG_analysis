@@ -709,7 +709,7 @@ def compare_within_subject(df, selected_subjects, save_path, model_name):
 
 
 if __name__ == "__main__":
-    task = "compare_logreg_c"
+    task = "plot_dnn_res"
 
     if task == "compare_logreg_c":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/architectures/ebg4_ebg_rf_pca/"
@@ -720,9 +720,9 @@ if __name__ == "__main__":
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_eeg_logreg_freq_lim_plots/"
         compare_logreg_c_tmin(path_to_data, path_to_save, "eeg")
     elif task == "plot_dnn_res":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/ebg4_resnet1d_source/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/ebg4_resnet1d_source_plots/"
-        plot_dnn_res(path_to_data, path_to_save, "source")
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/ebg4_eegnet1d_ebg/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/ebg4_eegnet1d_ebg_plots/"
+        plot_dnn_res(path_to_data, path_to_save, "ebg")
     elif task == "plot_dnn_win_res":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_ebg/"
         path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/cropped_win/ebg4_resnet1d_ebg_plots/"
