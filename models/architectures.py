@@ -69,7 +69,6 @@ class MLP(nn.Module):
         self.fc3 = nn.Linear(hidden_sizes[1], n_classes if n_classes > 2 else 1)
 
     def forward(self, x):
-
         if len(x.shape) > 2:
             batch_size = x.shape[0]
             x = x.view(batch_size, -1)
