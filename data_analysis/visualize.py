@@ -561,7 +561,8 @@ def compare_logreg_c(root_path, save_path, modality, file_type='npy'):
         horizontal_bar_subject(best_scores, modality, "logreg", save_path)
         mean_score = np.mean(np.asarray([np.mean(best_scores[str(subject)]) for subject in subjects]))
         print("Average test AUC = ", mean_score)
-        print("Std Error = ", np.std(np.asarray([np.mean(best_scores[str(subject)]) for subject in subjects])))
+        print("Std Error = ",
+              np.std(np.asarray([np.mean(best_scores[str(subject)]) for subject in subjects]))/np.sqrt(len(subjects)))
     else:
         val_mean_score = np.mean(np.asarray([np.mean(best_scores[str(subject)]['val']) for subject in subjects]))
         val_std_err = np.std(np.asarray([np.mean(best_scores[str(subject)]['val']) for subject in subjects])) \
@@ -711,8 +712,8 @@ if __name__ == "__main__":
     task = "compare_logreg_c"
 
     if task == "compare_logreg_c":
-        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_rf/"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/ebg4_ebg_rf_plots/"
+        path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/architectures/ebg4_ebg_rf_pca/"
+        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c/architectures/ebg4_ebg_rf_pca_plots/"
         compare_logreg_c(path_to_data, path_to_save, "ebg")
     elif task == "compare_logreg_c_tmin":
         path_to_data = "/Volumes/T5 EVO/Smell/plots/ebg4_logreg/grid_search_c_tmin/ebg4_eeg_logreg_freq_lim/"
@@ -846,7 +847,7 @@ if __name__ == "__main__":
                              "scores_subjects_eegnet1d_source-ebg.pkl"
         path_to_eeg_source = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn/whole_win/ebg4_resnet1d_source-eeg_plots/" \
                              "scores_subjects_eegnet1d_source-eeg.pkl"
-        path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn"
+        # path_to_save = "/Volumes/T5 EVO/Smell/plots/ebg4_dnn"
         path_to_save = None
         scatterplot_multimodal(path_to_ebg, path_to_eeg, path_to_sniff, path_to_source, path_to_ebg_sniff,
                                path_to_eeg_sniff, path_to_source_sniff, path_to_eeg_ebg, path_to_source_ebg,
