@@ -48,6 +48,8 @@ def load_ml_model(model_name, modality=None, **kwargs):
     if model_name == "xgboost":
         pass
         # return XGBClassifier(**kwargs)
+    if model_name == "rf":
+        return Pipeline([('scaler', StandardScaler()), ('pca', PCA(n_components=0.99)), ('rf', ensemble.RandomForestClassifier(**kwargs))])
     if model_name == "svm":
         return Pipeline([('scaler', StandardScaler()), ('svm', SVC(**kwargs))])
     if model_name == "lda":

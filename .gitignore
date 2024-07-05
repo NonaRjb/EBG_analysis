@@ -4,4 +4,5 @@ __pycache__/
 scripts/
 .idea/
 scripts/
+scripts/grid_search.sh
 *.txt

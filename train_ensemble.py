@@ -25,10 +25,10 @@ from dataset.ebg4 import EBG4
 
 os.environ["WANDB_API_KEY"] = "d5a82a7201d64dd1120fa3be37072e9e06e382a1"
 os.environ['WANDB_START_METHOD'] = 'thread'
-# cluster_data_path = '/local_storage/datasets/nonar/ebg/'
-# cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
-cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
-cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
+cluster_data_path = '/local_storage/datasets/nonar/ebg/'
+cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
+# cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+# cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/plots/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Users/nonarajabi/Desktop/KTH/Smell/ebg_out/"
 

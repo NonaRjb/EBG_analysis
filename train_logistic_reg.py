@@ -17,8 +17,10 @@ import os
 
 from dataset.data_utils import load_ebg4, apply_tfr, crop_tfr, crop_temporal, apply_baseline
 
-cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
-cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+# cluster_data_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+# cluster_save_path = '/proj/berzelius-2023-338/users/x_nonra/data/Smell/'
+cluster_data_path = '/local_storage/datasets/nonar/ebg/'
+cluster_save_path = '/Midgard/home/nonar/data/ebg/ebg_out/'
 local_data_path = "/Volumes/T5 EVO/Smell/"
 local_save_path = "/Volumes/T5 EVO/Smell/"
 
@@ -33,8 +35,17 @@ model_kwargs = {
     'svm':{
         'C': 1.0,
         'kernel': 'linear',
+        'gamma': 'auto',
         'probability': True
         }, 
+    'rf':{
+        "n_estimators": 100,
+        "max_depth": 5,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "bootstrap": True,
+        "random_state": 42
+    },
     'gradboost':{
         "n_estimators": 100,
         "learning_rate": 0.1,
@@ -340,7 +351,10 @@ if __name__ == "__main__":
             best_params_win = []
             for win in time_windows:
                 tfr_cropped = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
-                # data_array = crop_temporal(data_array, win[0], win[1], t)
+                data_array = crop_temporal(data_array, win[0], win[1], t)
+                # tfr_cropped1 = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=50, fmax=70, tvec=t, freqs=freqs, w=w)
+                # tfr_cropped2 = crop_tfr(tfr, tmin=win[0], tmax=win[1], fmin=12, fmax=16, tvec=t, freqs=freqs, w=w)
+                # tfr_cropped = np.concatenate((tfr_cropped1, tfr_cropped2), axis=2)
 
                 n_time_samples = tfr_cropped.shape[-1]
                 if args.data_type == "source":
@@ -354,6 +368,14 @@ if __name__ == "__main__":
                     tfr_mean = tfr_cropped.mean(axis=1).squeeze()
                     collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
                     tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
+                # if args.data_type == "source":
+                #     tfr_mean = tfr_cropped
+                # elif args.modality == "eeg":
+                #     # collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 6, 5, n_time_samples))
+                #     # tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+                #     tfr_mean = tfr_cropped
+                # else:
+                #     tfr_mean = tfr_cropped.mean(axis=1).squeeze()
             
                 # tfr_mean = tfr_feature_extract(tfr_cropped)
                 
@@ -367,6 +389,17 @@ if __name__ == "__main__":
                 if args.model == "gradboost": 
                     space[f'{args.model}__n_estimators'] = [50, 100, 150, 200]
                     space[f'{args.model}__max_depth'] = [3, 5, 7]
+                if args.model == "svm" and model_kwargs['svm']['kernel'] == "rbf":
+                    space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 7)]
+                    space[f'{args.model}__gamma'] = [pow(10, x) for x in range(-3, 3)]
+                if args.model == "svm" and model_kwargs['svm']['kernel'] == "poly":
+                    space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 7)]
+                    space[f'{args.model}__gamma'] = [pow(10, x) for x in range(-3, 3)]
+                    space[f'{args.model}__degree'] = [x for x in [2, 3, 5, 7]]
+                if args.model == "rf": 
+                    space[f'{args.model}__n_estimators'] = [50, 100, 150, 200]
+                    space[f'{args.model}__max_depth'] = [3, 5]
+                    space[f'{args.model}__min_samples_leaf'] = [1, 3, 5]
                 else:
                     space[f'{args.model}__C'] = [math.exp(x) for x in range(-1, 10)]
                 search = GridSearchCV(clf, space, scoring='roc_auc', cv=inner_cv, refit=True, error_score='raise')
@@ -392,6 +425,9 @@ if __name__ == "__main__":
             print(f"Best Window is {best_win}, (C = {best_c})")
 
             tfr_cropped = crop_tfr(tfr, tmin=best_win[0], tmax=best_win[1], fmin=args.fmin, fmax=args.fmax, tvec=t, freqs=freqs, w=w)
+            # tfr_cropped1 = crop_tfr(tfr, tmin=best_win[0], tmax=best_win[1], fmin=50, fmax=70, tvec=t, freqs=freqs, w=w)
+            # tfr_cropped2 = crop_tfr(tfr, tmin=best_win[0], tmax=best_win[1], fmin=12, fmax=16, tvec=t, freqs=freqs, w=w)
+            # tfr_cropped = np.concatenate((tfr_cropped1, tfr_cropped2), axis=2)
             
             n_time_samples = tfr_cropped.shape[-1]
             if args.data_type == "source":
@@ -404,6 +440,14 @@ if __name__ == "__main__":
                 tfr_mean = tfr_cropped.mean(axis=1).squeeze()
                 collapsed_tfr_mean = tfr_mean.reshape((n_trials, 12, 5, n_time_samples))  # 12, 5 is because I consider fmin=10 and fmax=70
                 tfr_mean = np.mean(collapsed_tfr_mean, axis=2)
+            # if args.data_type == "source":
+            #     tfr_mean = tfr_cropped
+            # elif args.modality == "eeg":
+            #     # collapsed_tfr_mean = tfr_cropped.reshape((n_trials, 63, 6, 5, n_time_samples))
+            #     # tfr_mean = np.mean(collapsed_tfr_mean, axis=3)
+            #     tfr_mean = tfr_cropped
+            # else:
+            #     tfr_mean = tfr_cropped.mean(axis=1).squeeze()
             
             # tfr_mean = tfr_feature_extract(tfr_cropped)
             

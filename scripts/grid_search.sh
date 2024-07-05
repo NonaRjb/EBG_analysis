@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
-#SBATCH -A berzelius-2023-338
 #SBATCH --mem  10GB
-#SBATCH --gpus=0
-#SBATCH --cpus-per-task 1
-#SBATCH -t 05:00:00
-#SBATCH --mail-type FAIL
+#SBATCH --gres gpu:0
+#SBATCH --cpus-per-task 4
+#SBATCH --constrain "eowyn|galadriel|belegost"
+#SBATCH --mail-type BEGIN,END,FAIL
 #SBATCH --mail-user nonar@kth.se
-#SBATCH --output /proj/berzelius-2023-338/users/x_nonra/EBG_analysis/logs/cluster_logs/%A_%a_slurm.out
-#SBATCH --error  /proj/berzelius-2023-338/users/x_nonra/EBG_analysis/logs/cluster_logs/%A_%a_slurm.err
+#SBATCH --output /Midgard/home/%u/EBG_analysis/logs/cluster_logs/%A_%a_slurm.out
+#SBATCH --error  /Midgard/home/%u/EBG_analysis/logs/cluster_logs/%A_%a_slurm.err
 #SBATCH --array=1-52%10
 
 echo "Hello $USER! You are on node $HOSTNAME. The time is $(date)"
 nvidia-smi
-cd /proj/berzelius-2023-338/users/x_nonra/EBG_analysis
-module load Mambaforge/23.3.1-1-hpc1-bdist
-mamba activate eegnet_pytorch 
+# Activate conda
+source "${HOME}/miniconda3/etc/profile.d/conda.sh"
+if [ "${SLURMD_NODENAME}" == "galadriel" ]; then
+  conda activate cuda_11
+elif [ "${SLURMD_NODENAME}" == "eowyn" ]; then
+  conda activate cuda_11
+else
+  conda activate eegnet_pytorch
+fi
 
 # c_array=(0.0625 0.25 0.5 1 2 4 8 16 32 64)
 # t_array=(-0.6 -0.1 0.4 0.9)
@@ -26,5 +31,5 @@ subject_id=${s_array[`expr $((SLURM_ARRAY_TASK_ID-1)) % ${#s_array[@]}`]}
 
 # python3 -m debugpy --listen 0.0.0.0:5678 --wait-for-client train_logistic_reg.py --subject_id 0 --data ebg4 --data_type sensor_ica --modality ebg --tmin -0.5 \
 # --tmax 1.5 --fmin 10 --fmax 70 -c 1 --seed 42 --save
-python3 train_logreg_kfold.py --subject_id "$subject_id" --data ebg4 --data_type sensor_ica --modality sniff --tmin 0.0 \
---tmax 1.0 --fmin 10 --fmax 70 -c 1.0 --model logreg --task "grid_search_c" --seed 42 --save
+python3 train_logistic_reg.py --subject_id "$subject_id" --data ebg4 --data_type sensor_ica --modality ebg --tmin 0.0 \
+--tmax 1.0 --fmin 10 --fmax 70 -c 1.0 --model svm --task "grid_search_c" --seed 42 --save
